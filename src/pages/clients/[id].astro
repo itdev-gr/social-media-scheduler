@@ -15,6 +15,7 @@ let clientName = '';
 let clientCreatedAt = '';
 let clientNotes = '';
 let clientActive = true;
+let clientClickupId = '';
 let months: string[] = [];
 let initialItems: any[] = [];
 let allItems: any[] = [];
@@ -30,11 +31,12 @@ try {
   if (!clientDoc.exists) {
     return Astro.redirect('/clients');
   }
-  const clientData = clientDoc.data() as { name: string; createdAt: string; notes?: string; active?: boolean };
+  const clientData = clientDoc.data() as { name: string; createdAt: string; notes?: string; active?: boolean; clickupId?: string };
   clientName = clientData.name;
   clientCreatedAt = clientData.createdAt;
   clientNotes = clientData.notes || '';
   clientActive = clientData.active !== false; // default to true
+  clientClickupId = clientData.clickupId || '';
 
   // Run all queries in parallel
   const [planSnap, monthsSnap, allSnap] = await Promise.all([
@@ -89,6 +91,7 @@ try {
     client:load
     clientId={id}
     clientName={clientName}
+    clickupId={clientClickupId}
     createdAt={clientCreatedAt}
     startMonth={planData.startMonth}
     monthsCount={planData.monthsCount}
@@ -109,7 +112,7 @@ try {
   ) : (
     <>
       <div class="mb-8">
-        <Calendar client:idle items={allItems} />
+        <Calendar client:idle items={allItems} clientId={id} clientName={clientName} />
       </div>
       <PipelineLine
         client:load

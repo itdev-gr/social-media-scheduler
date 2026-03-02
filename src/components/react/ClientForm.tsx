@@ -9,6 +9,7 @@ interface GenerateResponse {
 
 export default function ClientForm() {
   const [clientName, setClientName] = useState('');
+  const [clickupId, setClickupId] = useState('');
   const [startMonth, setStartMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -36,6 +37,7 @@ export default function ClientForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientName,
+          clickupId,
           startMonth,
           monthsCount,
           postsPerMonth,
@@ -75,6 +77,17 @@ export default function ClientForm() {
           className={inputClass}
           placeholder="e.g. Acme Corp"
           required
+        />
+      </div>
+
+      <div>
+        <label className={labelClass}>ClickUp ID</label>
+        <input
+          type="text"
+          value={clickupId}
+          onChange={(e) => setClickupId(e.target.value)}
+          className={inputClass}
+          placeholder="e.g. abc123xyz"
         />
       </div>
 

@@ -18,6 +18,8 @@ interface CalendarItem {
 
 interface Props {
   items: CalendarItem[];
+  clientId?: string;
+  clientName?: string;
 }
 
 const CONTENT_COLORS: Record<ContentType, string> = {
@@ -56,7 +58,7 @@ function getMonday(d: Date): Date {
   return date;
 }
 
-export default function Calendar({ items: initialItems }: Props) {
+export default function Calendar({ items: initialItems, clientId, clientName }: Props) {
   const [items, setItems] = useState<CalendarItem[]>(initialItems);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => {
@@ -77,6 +79,14 @@ export default function Calendar({ items: initialItems }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
+  // Create task state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createType, setCreateType] = useState<ContentType>('POST');
+  const [createDate, setCreateDate] = useState('');
+  const [createStatus, setCreateStatus] = useState<ContentStatus>('todo');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
   const { year, month } = currentDate;
 
   function openModal(item: CalendarItem) {
@@ -90,6 +100,14 @@ export default function Calendar({ items: initialItems }: Props) {
   function closeModal() {
     setSelected(null);
     setSaveError('');
+  }
+
+  function openCreateModal(prefilledDate?: string) {
+    setCreateType('POST');
+    setCreateStatus('todo');
+    setCreateDate(prefilledDate || formatDateStr(new Date()));
+    setCreateError('');
+    setShowCreateModal(true);
   }
 
   // Month navigation
@@ -171,6 +189,49 @@ export default function Calendar({ items: initialItems }: Props) {
       setSaveError('Network error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCreate() {
+    if (!clientId) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          type: createType,
+          scheduledDate: createDate,
+          status: createStatus,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setCreateError(data.error || 'Failed to create task');
+        return;
+      }
+      const data = await res.json();
+      setItems((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          type: data.type,
+          number: data.number,
+          status: data.status,
+          scheduledDate: data.scheduledDate,
+          scheduledDay: data.scheduledDay,
+          monthLabel: data.monthLabel,
+          clientId: data.clientId,
+          clientName: clientName || '',
+        },
+      ]);
+      setShowCreateModal(false);
+    } catch {
+      setCreateError('Network error');
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -303,6 +364,14 @@ export default function Calendar({ items: initialItems }: Props) {
           </div>
 
           <div className="flex items-center gap-2">
+            {clientId && (
+              <button
+                onClick={() => openCreateModal()}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                + Create Task
+              </button>
+            )}
             <button
               onClick={goToToday}
               className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -349,12 +418,22 @@ export default function Calendar({ items: initialItems }: Props) {
                 return (
                   <div
                     key={i}
-                    className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 ${cell.day === null ? 'bg-gray-50' : ''}`}
+                    className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 ${cell.day === null ? 'bg-gray-50' : 'group'}`}
                   >
                     {cell.day !== null && (
                       <>
-                        <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
-                          {cell.day}
+                        <div className="flex items-center justify-between mb-1">
+                          <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
+                            {cell.day}
+                          </div>
+                          {clientId && (
+                            <button
+                              onClick={() => openCreateModal(cell.dateStr)}
+                              className="w-5 h-5 flex items-center justify-center rounded text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all text-xs"
+                            >
+                              +
+                            </button>
+                          )}
                         </div>
                         <div className="space-y-1">
                           {dayItems.map((item) => renderItemChip(item))}
@@ -388,7 +467,15 @@ export default function Calendar({ items: initialItems }: Props) {
               {weekDays.map((wd) => {
                 const dayItems = itemsByDate.get(wd.dateStr) || [];
                 return (
-                  <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2">
+                  <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2 group">
+                    {clientId && (
+                      <button
+                        onClick={() => openCreateModal(wd.dateStr)}
+                        className="w-full mb-1.5 py-1 text-xs text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        + Add
+                      </button>
+                    )}
                     <div className="space-y-1.5">
                       {dayItems.map((item) => (
                         <button
@@ -538,6 +625,103 @@ export default function Calendar({ items: initialItems }: Props) {
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCreateModal(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Create Task</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className={labelClass}>Content Type</label>
+                <div className="flex gap-2">
+                  {TYPE_OPTIONS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setCreateType(t)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        createType === t
+                          ? `text-white ${CONTENT_COLORS[t]}`
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Scheduled Date</label>
+                <input
+                  type="date"
+                  value={createDate}
+                  onChange={(e) => setCreateDate(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Status</label>
+                <div className="flex gap-2">
+                  {STATUS_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setCreateStatus(s)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        createStatus === s
+                          ? STATUS_COLORS[s] + ' ring-2 ring-offset-1 ring-gray-300'
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {createError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {createError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {creating ? 'Creating...' : 'Create Task'}
               </button>
             </div>
           </div>

@@ -11,6 +11,7 @@ export interface Client {
   createdAt: string; // ISO string
   notes?: string;
   active?: boolean; // defaults to true
+  clickupId?: string;
 }
 
 export interface Plan {
@@ -57,6 +58,7 @@ export interface GenerateRequest {
   carouselsPerMonth: number;
   storiesPerMonth: number;
   notes?: string;
+  clickupId?: string;
 }
 
 export interface GenerateResponse {

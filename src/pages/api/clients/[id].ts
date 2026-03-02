@@ -64,37 +64,74 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     }
 
     const body = await request.json();
-    const updates: Record<string, unknown> = {};
+    const clientUpdates: Record<string, unknown> = {};
+    const planUpdates: Record<string, unknown> = {};
+
+    // Client fields
+    if (body.name !== undefined) {
+      if (typeof body.name !== 'string' || !body.name.trim()) {
+        return new Response(JSON.stringify({ error: 'Name must be a non-empty string' }), { status: 400 });
+      }
+      clientUpdates.name = body.name.trim();
+    }
+
+    if (body.clickupId !== undefined) {
+      if (typeof body.clickupId !== 'string') {
+        return new Response(JSON.stringify({ error: 'ClickUp ID must be a string' }), { status: 400 });
+      }
+      clientUpdates.clickupId = body.clickupId;
+    }
 
     if (body.notes !== undefined) {
       if (typeof body.notes !== 'string') {
         return new Response(JSON.stringify({ error: 'Notes must be a string' }), { status: 400 });
       }
-      updates.notes = body.notes;
+      clientUpdates.notes = body.notes;
     }
 
     if (body.active !== undefined) {
       if (typeof body.active !== 'boolean') {
         return new Response(JSON.stringify({ error: 'Active must be a boolean' }), { status: 400 });
       }
-      updates.active = body.active;
+      clientUpdates.active = body.active;
     }
 
-    if (Object.keys(updates).length === 0) {
+    // Plan fields
+    const planFields = ['postsPerMonth', 'scenariosPerMonth', 'carouselsPerMonth', 'storiesPerMonth'];
+    for (const field of planFields) {
+      if (body[field] !== undefined) {
+        if (typeof body[field] !== 'number' || body[field] < 0) {
+          return new Response(JSON.stringify({ error: `${field} must be a non-negative number` }), { status: 400 });
+        }
+        planUpdates[field] = body[field];
+      }
+    }
+
+    if (Object.keys(clientUpdates).length === 0 && Object.keys(planUpdates).length === 0) {
       return new Response(JSON.stringify({ error: 'No valid fields to update' }), { status: 400 });
     }
 
     const db = getDb();
-    const ref = db.collection('clients').doc(id);
-    const doc = await ref.get();
 
-    if (!doc.exists) {
-      return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
+    // Update client
+    if (Object.keys(clientUpdates).length > 0) {
+      const ref = db.collection('clients').doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
+      }
+      await ref.update(clientUpdates);
     }
 
-    await ref.update(updates);
+    // Update plan
+    if (Object.keys(planUpdates).length > 0) {
+      const planSnap = await db.collection('plans').where('clientId', '==', id).limit(1).get();
+      if (!planSnap.empty) {
+        await planSnap.docs[0].ref.update(planUpdates);
+      }
+    }
 
-    return new Response(JSON.stringify({ id, ...updates }), {
+    return new Response(JSON.stringify({ id, ...clientUpdates, ...planUpdates }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
