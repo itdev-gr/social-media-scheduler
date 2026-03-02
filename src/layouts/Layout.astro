@@ -62,41 +62,5 @@ const navLinks = [
         <slot />
       </div>
     </main>
-    <!-- Anti-inspect protections -->
-    <style>
-      body {
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-      }
-    </style>
-    <script is:inline>
-      // Disable right-click context menu
-      document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-      // Block dev tools keyboard shortcuts
-      document.addEventListener('keydown', (e) => {
-        // F12
-        if (e.key === 'F12') {
-          e.preventDefault();
-          return;
-        }
-        const ctrl = e.ctrlKey || e.metaKey;
-        // Ctrl/Cmd + Shift + I (Inspect), J (Console), C (Element picker)
-        if (ctrl && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) {
-          e.preventDefault();
-          return;
-        }
-        // Ctrl/Cmd + U (View Source)
-        if (ctrl && (e.key === 'u' || e.key === 'U')) {
-          e.preventDefault();
-          return;
-        }
-      });
-
-      // Disable drag (prevents dragging images/elements)
-      document.addEventListener('dragstart', (e) => e.preventDefault());
-    </script>
   </body>
 </html>
