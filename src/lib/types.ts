@@ -1,5 +1,5 @@
 // Content types
-export type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL';
+export type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 
 // Content item status
 export type ContentStatus = 'todo' | 'doing' | 'done';
@@ -19,6 +19,7 @@ export interface Plan {
   postsPerMonth: number;
   videosPerMonth: number;
   carouselsPerMonth: number;
+  storiesPerMonth: number;
   createdAt: string;
 }
 
@@ -51,6 +52,7 @@ export interface GenerateRequest {
   postsPerMonth: number;
   videosPerMonth: number;
   carouselsPerMonth: number;
+  storiesPerMonth: number;
 }
 
 export interface GenerateResponse {

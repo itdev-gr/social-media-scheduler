@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 type ContentStatus = 'todo' | 'doing' | 'done';
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 
 interface ContentItemData {
   id: string;
@@ -18,15 +18,16 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<ContentStatus, string> = {
-  todo: 'bg-gray-100 text-gray-700',
-  doing: 'bg-blue-100 text-blue-700',
-  done: 'bg-green-100 text-green-700',
+  todo: 'bg-gray-100 text-gray-700 border-2 border-gray-300',
+  doing: 'bg-blue-100 text-blue-700 border-2 border-blue-400',
+  done: 'bg-green-100 text-green-700 border-2 border-green-400',
 };
 
 const CONTENT_COLORS: Record<ContentType, string> = {
   POST: 'bg-indigo-100 text-indigo-700',
   VIDEO: 'bg-purple-100 text-purple-700',
   CAROUSEL: 'bg-orange-100 text-orange-700',
+  STORY: 'bg-pink-100 text-pink-700',
 };
 
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];

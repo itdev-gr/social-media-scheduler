@@ -3,7 +3,7 @@ import MonthSelector from './MonthSelector';
 import PipelineItem from './PipelineItem';
 
 type ContentStatus = 'todo' | 'doing' | 'done';
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 
 interface ContentItemData {
   id: string;

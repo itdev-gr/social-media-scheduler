@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 type ContentStatus = 'todo' | 'doing' | 'done';
 type ViewMode = 'month' | 'week';
 
@@ -23,6 +23,7 @@ const CONTENT_COLORS: Record<ContentType, string> = {
   POST: 'bg-indigo-500',
   VIDEO: 'bg-purple-500',
   CAROUSEL: 'bg-orange-500',
+  STORY: 'bg-pink-500',
 };
 
 const STATUS_RING: Record<ContentStatus, string> = {
@@ -37,7 +38,7 @@ const STATUS_COLORS: Record<ContentStatus, string> = {
   done: 'bg-green-100 text-green-700',
 };
 
-const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL'];
+const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 

@@ -51,6 +51,7 @@ export const POST: APIRoute = async ({ request }) => {
       postsPerMonth: body.postsPerMonth || 0,
       videosPerMonth: body.videosPerMonth || 0,
       carouselsPerMonth: body.carouselsPerMonth || 0,
+      storiesPerMonth: body.storiesPerMonth || 0,
       createdAt: now,
     };
     await planRef.set(plan);
@@ -81,7 +82,8 @@ export const POST: APIRoute = async ({ request }) => {
         m.month,
         body.postsPerMonth || 0,
         body.videosPerMonth || 0,
-        body.carouselsPerMonth || 0
+        body.carouselsPerMonth || 0,
+        body.storiesPerMonth || 0
       );
 
       for (const item of scheduledItems) {

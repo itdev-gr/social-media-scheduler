@@ -43,7 +43,8 @@ export function scheduleMonth(
   month: number,
   posts: number,
   videos: number,
-  carousels: number
+  carousels: number,
+  stories: number = 0
 ): ScheduledItem[] {
   const totalDays = daysInMonth(year, month);
   const occupied = new Set<number>();
@@ -53,6 +54,7 @@ export function scheduleMonth(
     { type: 'POST', count: posts },
     { type: 'VIDEO', count: videos },
     { type: 'CAROUSEL', count: carousels },
+    { type: 'STORY', count: stories },
   ];
 
   for (const { type, count } of contentTypes) {

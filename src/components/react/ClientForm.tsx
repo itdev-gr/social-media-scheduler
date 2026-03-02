@@ -17,6 +17,7 @@ export default function ClientForm() {
   const [postsPerMonth, setPostsPerMonth] = useState(8);
   const [videosPerMonth, setVideosPerMonth] = useState(2);
   const [carouselsPerMonth, setCarouselsPerMonth] = useState(4);
+  const [storiesPerMonth, setStoriesPerMonth] = useState(4);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -39,6 +40,7 @@ export default function ClientForm() {
           postsPerMonth,
           videosPerMonth,
           carouselsPerMonth,
+          storiesPerMonth,
         }),
       });
 
@@ -99,7 +101,7 @@ export default function ClientForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
           <label className={labelClass}>Posts / month</label>
           <input
@@ -126,6 +128,16 @@ export default function ClientForm() {
             type="number"
             value={carouselsPerMonth}
             onChange={(e) => setCarouselsPerMonth(Number(e.target.value))}
+            className={inputClass}
+            min={0}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Stories / month</label>
+          <input
+            type="number"
+            value={storiesPerMonth}
+            onChange={(e) => setStoriesPerMonth(Number(e.target.value))}
             className={inputClass}
             min={0}
           />

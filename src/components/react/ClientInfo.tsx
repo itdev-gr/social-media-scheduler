@@ -9,6 +9,7 @@ interface Props {
   postsPerMonth: number;
   videosPerMonth: number;
   carouselsPerMonth: number;
+  storiesPerMonth: number;
   totalItems: number;
   todoCount: number;
   doingCount: number;
@@ -25,6 +26,7 @@ export default function ClientInfo({
   postsPerMonth,
   videosPerMonth,
   carouselsPerMonth,
+  storiesPerMonth,
   totalItems,
   todoCount,
   doingCount,
@@ -96,7 +98,7 @@ export default function ClientInfo({
         </div>
 
         {/* Plan details */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-5">
           <div className="bg-gray-50 rounded-lg px-3 py-2">
             <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Start</div>
             <div className="text-sm font-semibold text-gray-900 mt-0.5">{startLabel}</div>
@@ -117,9 +119,13 @@ export default function ClientInfo({
             <div className="text-[10px] font-medium text-orange-400 uppercase tracking-wider">Carousels / mo</div>
             <div className="text-sm font-semibold text-orange-700 mt-0.5">{carouselsPerMonth}</div>
           </div>
+          <div className="bg-pink-50 rounded-lg px-3 py-2">
+            <div className="text-[10px] font-medium text-pink-400 uppercase tracking-wider">Stories / mo</div>
+            <div className="text-sm font-semibold text-pink-700 mt-0.5">{storiesPerMonth}</div>
+          </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2">
             <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total / mo</div>
-            <div className="text-sm font-semibold text-gray-900 mt-0.5">{postsPerMonth + videosPerMonth + carouselsPerMonth}</div>
+            <div className="text-sm font-semibold text-gray-900 mt-0.5">{postsPerMonth + videosPerMonth + carouselsPerMonth + storiesPerMonth}</div>
           </div>
         </div>
 
