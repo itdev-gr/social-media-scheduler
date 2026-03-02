@@ -10,6 +10,7 @@ export interface Client {
   name: string;
   createdAt: string; // ISO string
   notes?: string;
+  active?: boolean; // defaults to true
 }
 
 export interface Plan {

@@ -18,6 +18,13 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       updates.notes = body.notes;
     }
 
+    if (body.active !== undefined) {
+      if (typeof body.active !== 'boolean') {
+        return new Response(JSON.stringify({ error: 'Active must be a boolean' }), { status: 400 });
+      }
+      updates.active = body.active;
+    }
+
     if (Object.keys(updates).length === 0) {
       return new Response(JSON.stringify({ error: 'No valid fields to update' }), { status: 400 });
     }

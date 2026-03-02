@@ -15,6 +15,7 @@ interface Props {
   doingCount: number;
   doneCount: number;
   initialNotes: string;
+  initialActive: boolean;
 }
 
 export default function ClientInfo({
@@ -32,8 +33,10 @@ export default function ClientInfo({
   doingCount,
   doneCount,
   initialNotes,
+  initialActive,
 }: Props) {
   const [notes, setNotes] = useState(initialNotes);
+  const [active, setActive] = useState(initialActive);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -49,6 +52,21 @@ export default function ClientInfo({
     month: 'long',
     year: 'numeric',
   });
+
+  async function toggleActive() {
+    const newActive = !active;
+    setActive(newActive);
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: newActive }),
+      });
+      if (!res.ok) setActive(!newActive); // revert on failure
+    } catch {
+      setActive(!newActive);
+    }
+  }
 
   async function saveNotes() {
     setSaving(true);
@@ -84,7 +102,19 @@ export default function ClientInfo({
         {/* Top row: name + meta */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{clientName}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold text-gray-900">{clientName}</h2>
+              <button
+                onClick={toggleActive}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${
+                  active
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-red-100 text-red-700 border border-red-300'
+                }`}
+              >
+                {active ? 'Active' : 'Inactive'}
+              </button>
+            </div>
             <p className="text-xs text-gray-400 mt-0.5">Created {createdDate}</p>
           </div>
           <div className="flex gap-2 flex-wrap">
