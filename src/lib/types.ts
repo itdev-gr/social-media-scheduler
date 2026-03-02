@@ -1,5 +1,5 @@
 // Content types
-export type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
+export type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
 
 // Content item status
 export type ContentStatus = 'todo' | 'doing' | 'done';
@@ -18,7 +18,7 @@ export interface Plan {
   startMonth: string; // YYYY-MM
   monthsCount: number;
   postsPerMonth: number;
-  videosPerMonth: number;
+  scenariosPerMonth: number; // also determines videosPerMonth (1:1)
   carouselsPerMonth: number;
   storiesPerMonth: number;
   createdAt: string;
@@ -40,6 +40,7 @@ export interface ContentItem {
   monthId: string;
   monthLabel: string; // YYYY-MM
   type: ContentType;
+  number: number; // e.g. 1, 2, 3 — global per type across all months
   scheduledDay: number; // day of month
   scheduledDate: string; // YYYY-MM-DD
   status: ContentStatus;
@@ -51,7 +52,7 @@ export interface GenerateRequest {
   startMonth: string; // YYYY-MM
   monthsCount: number;
   postsPerMonth: number;
-  videosPerMonth: number;
+  scenariosPerMonth: number; // creates both SCENARIO and VIDEO items
   carouselsPerMonth: number;
   storiesPerMonth: number;
   notes?: string;

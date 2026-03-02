@@ -15,7 +15,7 @@ export default function ClientForm() {
   });
   const [monthsCount, setMonthsCount] = useState(3);
   const [postsPerMonth, setPostsPerMonth] = useState(8);
-  const [videosPerMonth, setVideosPerMonth] = useState(2);
+  const [scenariosPerMonth, setScenariosPerMonth] = useState(2);
   const [carouselsPerMonth, setCarouselsPerMonth] = useState(4);
   const [storiesPerMonth, setStoriesPerMonth] = useState(4);
   const [notes, setNotes] = useState('');
@@ -39,7 +39,7 @@ export default function ClientForm() {
           startMonth,
           monthsCount,
           postsPerMonth,
-          videosPerMonth,
+          scenariosPerMonth,
           carouselsPerMonth,
           storiesPerMonth,
           notes,
@@ -115,11 +115,11 @@ export default function ClientForm() {
           />
         </div>
         <div>
-          <label className={labelClass}>Videos / month</label>
+          <label className={labelClass}>Scenarios & Videos / month</label>
           <input
             type="number"
-            value={videosPerMonth}
-            onChange={(e) => setVideosPerMonth(Number(e.target.value))}
+            value={scenariosPerMonth}
+            onChange={(e) => setScenariosPerMonth(Number(e.target.value))}
             className={inputClass}
             min={0}
           />

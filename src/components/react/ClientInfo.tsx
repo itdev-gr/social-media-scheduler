@@ -7,7 +7,7 @@ interface Props {
   startMonth: string;
   monthsCount: number;
   postsPerMonth: number;
-  videosPerMonth: number;
+  scenariosPerMonth: number;
   carouselsPerMonth: number;
   storiesPerMonth: number;
   totalItems: number;
@@ -24,7 +24,7 @@ export default function ClientInfo({
   startMonth,
   monthsCount,
   postsPerMonth,
-  videosPerMonth,
+  scenariosPerMonth,
   carouselsPerMonth,
   storiesPerMonth,
   totalItems,
@@ -111,9 +111,9 @@ export default function ClientInfo({
             <div className="text-[10px] font-medium text-indigo-400 uppercase tracking-wider">Posts / mo</div>
             <div className="text-sm font-semibold text-indigo-700 mt-0.5">{postsPerMonth}</div>
           </div>
-          <div className="bg-purple-50 rounded-lg px-3 py-2">
-            <div className="text-[10px] font-medium text-purple-400 uppercase tracking-wider">Videos / mo</div>
-            <div className="text-sm font-semibold text-purple-700 mt-0.5">{videosPerMonth}</div>
+          <div className="bg-teal-50 rounded-lg px-3 py-2">
+            <div className="text-[10px] font-medium text-teal-400 uppercase tracking-wider">Scenarios / mo</div>
+            <div className="text-sm font-semibold text-teal-700 mt-0.5">{scenariosPerMonth}</div>
           </div>
           <div className="bg-orange-50 rounded-lg px-3 py-2">
             <div className="text-[10px] font-medium text-orange-400 uppercase tracking-wider">Carousels / mo</div>
@@ -125,7 +125,7 @@ export default function ClientInfo({
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2">
             <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total / mo</div>
-            <div className="text-sm font-semibold text-gray-900 mt-0.5">{postsPerMonth + videosPerMonth + carouselsPerMonth + storiesPerMonth}</div>
+            <div className="text-sm font-semibold text-gray-900 mt-0.5">{postsPerMonth + (scenariosPerMonth * 2) + carouselsPerMonth + storiesPerMonth}</div>
           </div>
         </div>
 

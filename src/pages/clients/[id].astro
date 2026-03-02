@@ -17,7 +17,7 @@ let clientNotes = '';
 let months: string[] = [];
 let initialItems: any[] = [];
 let allItems: any[] = [];
-let planData = { startMonth: '', monthsCount: 0, postsPerMonth: 0, videosPerMonth: 0, carouselsPerMonth: 0, storiesPerMonth: 0 };
+let planData = { startMonth: '', monthsCount: 0, postsPerMonth: 0, scenariosPerMonth: 0, carouselsPerMonth: 0, storiesPerMonth: 0 };
 let todoCount = 0;
 let doingCount = 0;
 let doneCount = 0;
@@ -47,7 +47,7 @@ try {
       startMonth: p.startMonth,
       monthsCount: p.monthsCount,
       postsPerMonth: p.postsPerMonth,
-      videosPerMonth: p.videosPerMonth,
+      scenariosPerMonth: p.scenariosPerMonth || p.videosPerMonth || 0,
       carouselsPerMonth: p.carouselsPerMonth,
       storiesPerMonth: p.storiesPerMonth || 0,
     };
@@ -91,7 +91,7 @@ try {
     startMonth={planData.startMonth}
     monthsCount={planData.monthsCount}
     postsPerMonth={planData.postsPerMonth}
-    videosPerMonth={planData.videosPerMonth}
+    scenariosPerMonth={planData.scenariosPerMonth}
     carouselsPerMonth={planData.carouselsPerMonth}
     storiesPerMonth={planData.storiesPerMonth}
     totalItems={allItems.length}

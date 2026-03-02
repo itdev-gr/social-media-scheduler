@@ -37,12 +37,14 @@ export function scheduleContentDays(
 /**
  * Schedules all content types for a given month, sharing one occupied set
  * so no two items land on the same day.
+ * Scenarios and Videos are linked: scenariosPerMonth creates both types
+ * on the same days.
  */
 export function scheduleMonth(
   year: number,
   month: number,
   posts: number,
-  videos: number,
+  scenarios: number,
   carousels: number,
   stories: number = 0
 ): ScheduledItem[] {
@@ -50,22 +52,29 @@ export function scheduleMonth(
   const occupied = new Set<number>();
   const items: ScheduledItem[] = [];
 
-  const contentTypes: { type: ContentType; count: number }[] = [
-    { type: 'POST', count: posts },
-    { type: 'VIDEO', count: videos },
-    { type: 'CAROUSEL', count: carousels },
-    { type: 'STORY', count: stories },
-  ];
+  // Schedule posts
+  const postDays = scheduleContentDays(posts, totalDays, occupied);
+  for (const day of postDays) {
+    items.push({ type: 'POST', day, date: makeDate(year, month, day) });
+  }
 
-  for (const { type, count } of contentTypes) {
-    const days = scheduleContentDays(count, totalDays, occupied);
-    for (const day of days) {
-      items.push({
-        type,
-        day,
-        date: makeDate(year, month, day),
-      });
-    }
+  // Schedule scenarios + videos on the same days
+  const scenarioDays = scheduleContentDays(scenarios, totalDays, occupied);
+  for (const day of scenarioDays) {
+    items.push({ type: 'SCENARIO', day, date: makeDate(year, month, day) });
+    items.push({ type: 'VIDEO', day, date: makeDate(year, month, day) });
+  }
+
+  // Schedule carousels
+  const carouselDays = scheduleContentDays(carousels, totalDays, occupied);
+  for (const day of carouselDays) {
+    items.push({ type: 'CAROUSEL', day, date: makeDate(year, month, day) });
+  }
+
+  // Schedule stories
+  const storyDays = scheduleContentDays(stories, totalDays, occupied);
+  for (const day of storyDays) {
+    items.push({ type: 'STORY', day, date: makeDate(year, month, day) });
   }
 
   items.sort((a, b) => a.day - b.day);

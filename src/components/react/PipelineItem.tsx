@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
 type ContentStatus = 'todo' | 'doing' | 'done';
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
 
 interface ContentItemData {
   id: string;
   type: ContentType;
+  number?: number;
   status: ContentStatus;
   scheduledDate: string;
   scheduledDay: number;
@@ -28,6 +29,7 @@ const CONTENT_COLORS: Record<ContentType, string> = {
   VIDEO: 'bg-purple-100 text-purple-700',
   CAROUSEL: 'bg-orange-100 text-orange-700',
   STORY: 'bg-pink-100 text-pink-700',
+  SCENARIO: 'bg-teal-100 text-teal-700',
 };
 
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
@@ -59,6 +61,8 @@ export default function PipelineItem({ item, onStatusChange }: Props) {
     }
   }
 
+  const label = item.number ? `${item.type} ${item.number}` : item.type;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-4">
       {/* Date */}
@@ -75,7 +79,7 @@ export default function PipelineItem({ item, onStatusChange }: Props) {
       <span
         className={`text-xs font-bold px-2.5 py-1 rounded flex-shrink-0 ${CONTENT_COLORS[item.type]}`}
       >
-        {item.type}
+        {label}
       </span>
 
       {/* Spacer */}

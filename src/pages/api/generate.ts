@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
-import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem } from '../../lib/types';
+import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType } from '../../lib/types';
 import { generateMonthSequence } from '../../lib/date-utils';
 import { scheduleMonth } from '../../lib/scheduler';
 
@@ -49,7 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
       startMonth: body.startMonth,
       monthsCount: body.monthsCount,
       postsPerMonth: body.postsPerMonth || 0,
-      videosPerMonth: body.videosPerMonth || 0,
+      scenariosPerMonth: body.scenariosPerMonth || 0,
       carouselsPerMonth: body.carouselsPerMonth || 0,
       storiesPerMonth: body.storiesPerMonth || 0,
       createdAt: now,
@@ -62,6 +62,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     const allContentWrites: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
     let contentItemsCreated = 0;
+
+    // Global counters per content type for numbering
+    const typeCounters = new Map<ContentType, number>();
 
     for (const m of months) {
       // Create month doc
@@ -81,12 +84,15 @@ export const POST: APIRoute = async ({ request }) => {
         m.year,
         m.month,
         body.postsPerMonth || 0,
-        body.videosPerMonth || 0,
+        body.scenariosPerMonth || 0,
         body.carouselsPerMonth || 0,
         body.storiesPerMonth || 0
       );
 
       for (const item of scheduledItems) {
+        const currentNum = (typeCounters.get(item.type) || 0) + 1;
+        typeCounters.set(item.type, currentNum);
+
         const contentRef = db.collection('content_items').doc();
         const contentItem: Omit<ContentItem, 'id'> = {
           clientId,
@@ -94,6 +100,7 @@ export const POST: APIRoute = async ({ request }) => {
           monthId,
           monthLabel: m.label,
           type: item.type,
+          number: currentNum,
           scheduledDay: item.day,
           scheduledDate: item.date,
           status: 'todo',

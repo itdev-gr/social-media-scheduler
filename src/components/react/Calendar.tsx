@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
 type ContentStatus = 'todo' | 'doing' | 'done';
 type ViewMode = 'month' | 'week';
 
 interface CalendarItem {
   id: string;
   type: ContentType;
+  number?: number;
   status: ContentStatus;
   scheduledDate: string;
   scheduledDay: number;
@@ -24,6 +25,7 @@ const CONTENT_COLORS: Record<ContentType, string> = {
   VIDEO: 'bg-purple-500',
   CAROUSEL: 'bg-orange-500',
   STORY: 'bg-pink-500',
+  SCENARIO: 'bg-teal-500',
 };
 
 const STATUS_RING: Record<ContentStatus, string> = {
@@ -38,7 +40,7 @@ const STATUS_COLORS: Record<ContentStatus, string> = {
   done: 'bg-green-100 text-green-700',
 };
 
-const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
+const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY', 'SCENARIO'];
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -268,7 +270,7 @@ export default function Calendar({ items: initialItems }: Props) {
         onClick={() => openModal(item)}
         className={`w-full text-left text-[10px] font-medium text-white px-1.5 py-0.5 rounded truncate ring-2 cursor-pointer hover:opacity-80 transition-opacity ${CONTENT_COLORS[item.type]} ${STATUS_RING[item.status]}`}
       >
-        {item.type} · {item.clientName}
+        {item.type}{item.number ? ` ${item.number}` : ''} · {item.clientName}
       </button>
     );
   }
@@ -394,7 +396,7 @@ export default function Calendar({ items: initialItems }: Props) {
                           onClick={() => openModal(item)}
                           className={`w-full text-left px-2 py-1.5 rounded-lg ring-2 cursor-pointer hover:opacity-80 transition-opacity ${CONTENT_COLORS[item.type]} ${STATUS_RING[item.status]}`}
                         >
-                          <div className="text-[11px] font-semibold text-white">{item.type}</div>
+                          <div className="text-[11px] font-semibold text-white">{item.type}{item.number ? ` ${item.number}` : ''}</div>
                           <div className="text-[10px] text-white/80 truncate">{item.clientName}</div>
                         </button>
                       ))}
