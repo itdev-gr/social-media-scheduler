@@ -60,12 +60,19 @@ export default function ClientInfo({
     }
     setDeleting(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete' }),
+      });
       if (res.ok) {
         window.location.href = '/clients';
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete client');
       }
     } catch {
-      // silent
+      alert('Network error while deleting client');
     } finally {
       setDeleting(false);
     }

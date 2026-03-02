@@ -1,11 +1,17 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
 
-export const DELETE: APIRoute = async ({ params }) => {
+export const POST: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ error: 'Client ID is required' }), { status: 400 });
+    }
+
+    const body = await request.json();
+
+    if (body.action !== 'delete') {
+      return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 });
     }
 
     const db = getDb();
