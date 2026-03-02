@@ -44,6 +44,8 @@ try {
     calendarItems.push({
       id: doc.id,
       type: data.type,
+      number: data.number,
+      customName: data.customName || undefined,
       status: data.status,
       scheduledDate: data.scheduledDate,
       scheduledDay: data.scheduledDay,

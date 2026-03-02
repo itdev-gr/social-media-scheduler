@@ -8,6 +8,7 @@ interface CalendarItem {
   id: string;
   type: ContentType;
   number?: number;
+  customName?: string;
   status: ContentStatus;
   scheduledDate: string;
   scheduledDay: number;
@@ -83,6 +84,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
   const [editType, setEditType] = useState<ContentType>('POST');
   const [editStatus, setEditStatus] = useState<ContentStatus>('todo');
   const [editDate, setEditDate] = useState('');
+  const [editName, setEditName] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -91,6 +93,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
   const [createClientId, setCreateClientId] = useState(clientId || '');
   const [createType, setCreateType] = useState<ContentType>('POST');
   const [createDate, setCreateDate] = useState('');
+  const [createName, setCreateName] = useState('');
   const [createStatus, setCreateStatus] = useState<ContentStatus>('todo');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -102,6 +105,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
     setEditType(item.type);
     setEditStatus(item.status);
     setEditDate(item.scheduledDate);
+    setEditName(item.customName || '');
     setSaveError('');
   }
 
@@ -113,6 +117,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
   function openCreateModal(prefilledDate?: string) {
     setCreateClientId(clientId || (clients && clients.length > 0 ? clients[0].id : ''));
     setCreateType('POST');
+    setCreateName('');
     setCreateStatus('todo');
     setCreateDate(prefilledDate || formatDateStr(new Date()));
     setCreateError('');
@@ -164,6 +169,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
     if (editType !== selected.type) updates.type = editType;
     if (editStatus !== selected.status) updates.status = editStatus;
     if (editDate !== selected.scheduledDate) updates.scheduledDate = editDate;
+    if (editName !== (selected.customName || '')) updates.customName = editName;
 
     if (Object.keys(updates).length === 0) {
       closeModal();
@@ -189,7 +195,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
       setItems((all) =>
         all.map((i) =>
           i.id === selected.id
-            ? { ...i, type: editType, status: editStatus, scheduledDate: editDate, scheduledDay: newDay, monthLabel: newMonthLabel }
+            ? { ...i, type: editType, status: editStatus, scheduledDate: editDate, scheduledDay: newDay, monthLabel: newMonthLabel, customName: editName || undefined }
             : i
         )
       );
@@ -214,6 +220,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
           type: createType,
           scheduledDate: createDate,
           status: createStatus,
+          ...(createName.trim() ? { customName: createName.trim() } : {}),
         }),
       });
       if (!res.ok) {
@@ -234,6 +241,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
           id: data.id,
           type: data.type,
           number: data.number,
+          customName: data.customName || undefined,
           status: data.status,
           scheduledDate: data.scheduledDate,
           scheduledDay: data.scheduledDay,
@@ -339,6 +347,11 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
   const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none';
   const labelClass = 'block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5';
 
+  function getItemLabel(item: CalendarItem): string {
+    if (item.customName) return item.customName;
+    return `${item.type}${item.number ? ` ${item.number}` : ''}`;
+  }
+
   function renderItemChip(item: CalendarItem) {
     return (
       <button
@@ -346,7 +359,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
         onClick={() => openModal(item)}
         className={`w-full text-left text-[10px] font-medium text-white px-1.5 py-0.5 rounded truncate ring-2 cursor-pointer hover:opacity-80 transition-opacity ${CONTENT_COLORS[item.type]} ${STATUS_RING[item.status]}`}
       >
-        {item.type}{item.number ? ` ${item.number}` : ''} · {item.clientName}
+        {getItemLabel(item)} · {item.clientName}
       </button>
     );
   }
@@ -498,7 +511,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
                           onClick={() => openModal(item)}
                           className={`w-full text-left px-2 py-1.5 rounded-lg ring-2 cursor-pointer hover:opacity-80 transition-opacity ${CONTENT_COLORS[item.type]} ${STATUS_RING[item.status]}`}
                         >
-                          <div className="text-[11px] font-semibold text-white">{item.type}{item.number ? ` ${item.number}` : ''}</div>
+                          <div className="text-[11px] font-semibold text-white">{getItemLabel(item)}</div>
                           <div className="text-[10px] text-white/80 truncate">{item.clientName}</div>
                         </button>
                       ))}
@@ -568,6 +581,17 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
               <div>
                 <label className={labelClass}>Client</label>
                 <p className="text-sm font-semibold text-gray-900">{selected.clientName}</p>
+              </div>
+
+              <div>
+                <label className={labelClass}>Task Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className={inputClass}
+                  placeholder="Leave empty for default (e.g. POST 1)"
+                />
               </div>
 
               <div>
@@ -681,6 +705,17 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
                   </select>
                 </div>
               )}
+
+              <div>
+                <label className={labelClass}>Task Name</label>
+                <input
+                  type="text"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. Meeting with client (optional)"
+                />
+              </div>
 
               <div>
                 <label className={labelClass}>Content Type</label>

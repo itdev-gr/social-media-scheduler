@@ -46,6 +46,7 @@ export interface ContentItem {
   scheduledDay: number; // day of month
   scheduledDate: string; // YYYY-MM-DD
   status: ContentStatus;
+  customName?: string; // optional user-defined name displayed on calendar
 }
 
 // API request/response

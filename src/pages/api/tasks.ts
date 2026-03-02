@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Create content item
     const scheduledDay = new Date(body.scheduledDate + 'T00:00:00').getDate();
     const contentRef = db.collection('content_items').doc();
-    const contentItem = {
+    const contentItem: Record<string, unknown> = {
       clientId: body.clientId,
       planId,
       monthId,
@@ -90,6 +90,9 @@ export const POST: APIRoute = async ({ request }) => {
       scheduledDate: body.scheduledDate,
       status,
     };
+    if (body.customName && typeof body.customName === 'string' && body.customName.trim()) {
+      contentItem.customName = body.customName.trim();
+    }
     await contentRef.set(contentItem);
 
     return new Response(JSON.stringify({ id: contentRef.id, ...contentItem }), {

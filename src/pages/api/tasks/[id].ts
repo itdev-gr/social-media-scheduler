@@ -37,6 +37,17 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       updates.type = body.type;
     }
 
+    // Custom name
+    if (body.customName !== undefined) {
+      if (typeof body.customName !== 'string') {
+        return new Response(
+          JSON.stringify({ error: 'customName must be a string' }),
+          { status: 400 }
+        );
+      }
+      updates.customName = body.customName.trim();
+    }
+
     // Scheduled date
     if (body.scheduledDate !== undefined) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(body.scheduledDate)) {

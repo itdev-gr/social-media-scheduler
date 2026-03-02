@@ -7,6 +7,7 @@ interface ContentItemData {
   id: string;
   type: ContentType;
   number?: number;
+  customName?: string;
   status: ContentStatus;
   scheduledDate: string;
   scheduledDay: number;
@@ -61,7 +62,7 @@ export default function PipelineItem({ item, onStatusChange }: Props) {
     }
   }
 
-  const label = item.number ? `${item.type} ${item.number}` : item.type;
+  const label = item.customName || (item.number ? `${item.type} ${item.number}` : item.type);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center gap-4">
