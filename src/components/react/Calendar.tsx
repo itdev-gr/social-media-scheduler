@@ -16,10 +16,16 @@ interface CalendarItem {
   clientName: string;
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   items: CalendarItem[];
   clientId?: string;
   clientName?: string;
+  clients?: ClientOption[];
 }
 
 const CONTENT_COLORS: Record<ContentType, string> = {
@@ -58,7 +64,8 @@ function getMonday(d: Date): Date {
   return date;
 }
 
-export default function Calendar({ items: initialItems, clientId, clientName }: Props) {
+export default function Calendar({ items: initialItems, clientId, clientName, clients }: Props) {
+  const canCreate = !!(clientId || (clients && clients.length > 0));
   const [items, setItems] = useState<CalendarItem[]>(initialItems);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => {
@@ -81,6 +88,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
 
   // Create task state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createClientId, setCreateClientId] = useState(clientId || '');
   const [createType, setCreateType] = useState<ContentType>('POST');
   const [createDate, setCreateDate] = useState('');
   const [createStatus, setCreateStatus] = useState<ContentStatus>('todo');
@@ -103,6 +111,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
   }
 
   function openCreateModal(prefilledDate?: string) {
+    setCreateClientId(clientId || (clients && clients.length > 0 ? clients[0].id : ''));
     setCreateType('POST');
     setCreateStatus('todo');
     setCreateDate(prefilledDate || formatDateStr(new Date()));
@@ -193,7 +202,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
   }
 
   async function handleCreate() {
-    if (!clientId) return;
+    if (!createClientId) return;
     setCreating(true);
     setCreateError('');
     try {
@@ -201,7 +210,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientId,
+          clientId: createClientId,
           type: createType,
           scheduledDate: createDate,
           status: createStatus,
@@ -213,6 +222,12 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
         return;
       }
       const data = await res.json();
+      // Resolve client name
+      let resolvedName = clientName || '';
+      if (!resolvedName && clients) {
+        const found = clients.find((c) => c.id === createClientId);
+        if (found) resolvedName = found.name;
+      }
       setItems((prev) => [
         ...prev,
         {
@@ -224,7 +239,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
           scheduledDay: data.scheduledDay,
           monthLabel: data.monthLabel,
           clientId: data.clientId,
-          clientName: clientName || '',
+          clientName: resolvedName,
         },
       ]);
       setShowCreateModal(false);
@@ -364,7 +379,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
           </div>
 
           <div className="flex items-center gap-2">
-            {clientId && (
+            {canCreate && (
               <button
                 onClick={() => openCreateModal()}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
@@ -426,7 +441,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
                           <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
                             {cell.day}
                           </div>
-                          {clientId && (
+                          {canCreate && (
                             <button
                               onClick={() => openCreateModal(cell.dateStr)}
                               className="w-5 h-5 flex items-center justify-center rounded text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all text-xs"
@@ -468,7 +483,7 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
                 const dayItems = itemsByDate.get(wd.dateStr) || [];
                 return (
                   <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2 group">
-                    {clientId && (
+                    {canCreate && (
                       <button
                         onClick={() => openCreateModal(wd.dateStr)}
                         className="w-full mb-1.5 py-1 text-xs text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-all"
@@ -652,6 +667,21 @@ export default function Calendar({ items: initialItems, clientId, clientName }: 
             </div>
 
             <div className="px-6 py-5 space-y-4">
+              {clients && clients.length > 0 && !clientId && (
+                <div>
+                  <label className={labelClass}>Client</label>
+                  <select
+                    value={createClientId}
+                    onChange={(e) => setCreateClientId(e.target.value)}
+                    className={inputClass}
+                  >
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className={labelClass}>Content Type</label>
                 <div className="flex gap-2">

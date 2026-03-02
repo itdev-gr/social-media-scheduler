@@ -10,6 +10,7 @@ let todoItems = 0;
 let doingItems = 0;
 let doneItems = 0;
 let calendarItems: any[] = [];
+let clientsList: { id: string; name: string }[] = [];
 
 try {
   const db = getDb();
@@ -31,9 +32,12 @@ try {
   doingItems = doingSnap.data().count;
   doneItems = doneSnap.data().count;
 
-  // Build client map from the single clients query
+  // Build client map and list from the single clients query
   const clientMap = new Map<string, string>();
-  clientsListSnap.docs.forEach((d) => clientMap.set(d.id, d.data().name));
+  clientsListSnap.docs.forEach((d) => {
+    clientMap.set(d.id, d.data().name);
+    clientsList.push({ id: d.id, name: d.data().name });
+  });
 
   for (const doc of recentItemsSnap.docs) {
     const data = doc.data();
@@ -64,6 +68,6 @@ try {
     doneItems={doneItems}
   />
   <div class="mt-8">
-    <Calendar client:idle items={calendarItems} />
+    <Calendar client:idle items={calendarItems} clients={clientsList} />
   </div>
 </Layout>
