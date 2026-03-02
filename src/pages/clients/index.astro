@@ -1,0 +1,74 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getDb } from '../../lib/firebase-admin';
+
+interface ClientDoc {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+let clients: ClientDoc[] = [];
+
+try {
+  const db = getDb();
+  const snap = await db.collection('clients').orderBy('createdAt', 'desc').get();
+  clients = snap.docs.map((doc) => ({
+    id: doc.id,
+    name: doc.data().name,
+    createdAt: doc.data().createdAt,
+  }));
+} catch (e) {
+  // Firebase not configured yet
+}
+---
+
+<Layout title="Clients">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold text-gray-900">Clients</h2>
+    <a
+      href="/clients/new"
+      class="bg-indigo-600 text-white rounded-lg py-2 px-4 text-sm font-medium hover:bg-indigo-700 transition-colors"
+    >
+      + New Client
+    </a>
+  </div>
+
+  {clients.length === 0 ? (
+    <p class="text-gray-500 text-sm">No clients yet. Create your first client to get started.</p>
+  ) : (
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">Name</th>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">Created</th>
+            <th class="text-right px-6 py-3 font-medium text-gray-500">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {clients.map((client) => (
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 font-medium text-gray-900">{client.name}</td>
+              <td class="px-6 py-4 text-gray-500">
+                {new Date(client.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <a
+                  href={`/clients/${client.id}`}
+                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  View Pipeline &rarr;
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</Layout>

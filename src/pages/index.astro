@@ -1,0 +1,71 @@
+---
+import Layout from '../layouts/Layout.astro';
+import DashboardCards from '../components/react/DashboardCards';
+import Calendar from '../components/react/Calendar';
+import { getDb } from '../lib/firebase-admin';
+
+let totalClients = 0;
+let totalItems = 0;
+let todoItems = 0;
+let doingItems = 0;
+let doneItems = 0;
+let calendarItems: any[] = [];
+
+try {
+  const db = getDb();
+
+  const [clientsSnap, itemsSnap] = await Promise.all([
+    db.collection('clients').count().get(),
+    db.collection('content_items').get(),
+  ]);
+
+  totalClients = clientsSnap.data().count;
+  totalItems = itemsSnap.size;
+
+  // Collect client IDs for name lookup
+  const clientIds = [...new Set(itemsSnap.docs.map((d) => d.data().clientId))];
+  const clientMap = new Map<string, string>();
+  for (let i = 0; i < clientIds.length; i += 30) {
+    const chunk = clientIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const snap = await db.collection('clients').where('__name__', 'in', chunk).get();
+    snap.docs.forEach((d) => clientMap.set(d.id, d.data().name));
+  }
+
+  for (const doc of itemsSnap.docs) {
+    const data = doc.data();
+    const status = data.status;
+    if (status === 'todo') todoItems++;
+    else if (status === 'doing') doingItems++;
+    else if (status === 'done') doneItems++;
+
+    calendarItems.push({
+      id: doc.id,
+      type: data.type,
+      status: data.status,
+      scheduledDate: data.scheduledDate,
+      scheduledDay: data.scheduledDay,
+      monthLabel: data.monthLabel,
+      clientId: data.clientId,
+      clientName: clientMap.get(data.clientId) || 'Unknown',
+    });
+  }
+} catch (e) {
+  // Firebase not configured yet
+}
+---
+
+<Layout title="Dashboard">
+  <h2 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
+  <DashboardCards
+    client:load
+    totalClients={totalClients}
+    totalItems={totalItems}
+    todoItems={todoItems}
+    doingItems={doingItems}
+    doneItems={doneItems}
+  />
+  <div class="mt-8">
+    <Calendar client:load items={calendarItems} />
+  </div>
+</Layout>

@@ -1,0 +1,63 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PipelineLine from '../../components/react/PipelineLine';
+import { getDb } from '../../lib/firebase-admin';
+
+let months: string[] = [];
+let initialItems: any[] = [];
+
+try {
+  const db = getDb();
+
+  // Get all distinct month labels
+  const monthsSnap = await db.collection('months').orderBy('label', 'asc').get();
+  months = [...new Set(monthsSnap.docs.map((d) => d.data().label))];
+
+  // Fetch content items for the first month
+  if (months.length > 0) {
+    const itemsSnap = await db
+      .collection('content_items')
+      .where('monthLabel', '==', months[0])
+      .orderBy('scheduledDate', 'asc')
+      .get();
+
+    // Batch lookup clients
+    const clientIds = [...new Set(itemsSnap.docs.map((d) => d.data().clientId))];
+    const clientMap = new Map<string, string>();
+    for (let i = 0; i < clientIds.length; i += 30) {
+      const chunk = clientIds.slice(i, i + 30);
+      if (chunk.length === 0) continue;
+      const snap = await db
+        .collection('clients')
+        .where('__name__', 'in', chunk)
+        .get();
+      snap.docs.forEach((d) => clientMap.set(d.id, d.data().name));
+    }
+
+    initialItems = itemsSnap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        clientName: clientMap.get(data.clientId) || 'Unknown',
+      };
+    });
+  }
+} catch (e) {
+  console.error('Pipelines page error:', e);
+}
+---
+
+<Layout title="Schedule">
+  <h2 class="text-2xl font-bold text-gray-900 mb-6">Schedule</h2>
+
+  {months.length === 0 ? (
+    <p class="text-gray-500 text-sm">No content scheduled yet. Create a client to get started.</p>
+  ) : (
+    <PipelineLine
+      client:load
+      months={months}
+      initialItems={initialItems}
+    />
+  )}
+</Layout>

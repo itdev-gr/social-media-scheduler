@@ -1,0 +1,127 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PipelineLine from '../../components/react/PipelineLine';
+import Calendar from '../../components/react/Calendar';
+import ClientInfo from '../../components/react/ClientInfo';
+import { getDb } from '../../lib/firebase-admin';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/clients');
+}
+
+let clientName = '';
+let clientCreatedAt = '';
+let clientNotes = '';
+let months: string[] = [];
+let initialItems: any[] = [];
+let allItems: any[] = [];
+let planData = { startMonth: '', monthsCount: 0, postsPerMonth: 0, videosPerMonth: 0, carouselsPerMonth: 0 };
+let todoCount = 0;
+let doingCount = 0;
+let doneCount = 0;
+
+try {
+  const db = getDb();
+
+  const clientDoc = await db.collection('clients').doc(id).get();
+  if (!clientDoc.exists) {
+    return Astro.redirect('/clients');
+  }
+  const clientData = clientDoc.data() as { name: string; createdAt: string; notes?: string };
+  clientName = clientData.name;
+  clientCreatedAt = clientData.createdAt;
+  clientNotes = clientData.notes || '';
+
+  // Fetch plan for this client
+  const planSnap = await db
+    .collection('plans')
+    .where('clientId', '==', id)
+    .limit(1)
+    .get();
+  if (!planSnap.empty) {
+    const p = planSnap.docs[0].data();
+    planData = {
+      startMonth: p.startMonth,
+      monthsCount: p.monthsCount,
+      postsPerMonth: p.postsPerMonth,
+      videosPerMonth: p.videosPerMonth,
+      carouselsPerMonth: p.carouselsPerMonth,
+    };
+  }
+
+  const monthsSnap = await db
+    .collection('months')
+    .where('clientId', '==', id)
+    .orderBy('label', 'asc')
+    .get();
+  months = monthsSnap.docs.map((d) => d.data().label);
+
+  // Fetch ALL content items for this client — single field filter, sort client-side
+  const allSnap = await db
+    .collection('content_items')
+    .where('clientId', '==', id)
+    .get();
+
+  allItems = allSnap.docs
+    .map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      clientName,
+    }))
+    .sort((a: any, b: any) => a.scheduledDate.localeCompare(b.scheduledDate));
+
+  for (const item of allItems) {
+    if (item.status === 'todo') todoCount++;
+    else if (item.status === 'doing') doingCount++;
+    else if (item.status === 'done') doneCount++;
+  }
+
+  // Filter initial items for the first month (for the list view)
+  if (months.length > 0) {
+    initialItems = allItems.filter((i: any) => i.monthLabel === months[0]);
+  }
+} catch (e) {
+  console.error('Client page error:', e);
+}
+---
+
+<Layout title={clientName || 'Client'}>
+  <div class="mb-6">
+    <a href="/clients" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to Clients</a>
+  </div>
+
+  <ClientInfo
+    client:load
+    clientId={id}
+    clientName={clientName}
+    createdAt={clientCreatedAt}
+    startMonth={planData.startMonth}
+    monthsCount={planData.monthsCount}
+    postsPerMonth={planData.postsPerMonth}
+    videosPerMonth={planData.videosPerMonth}
+    carouselsPerMonth={planData.carouselsPerMonth}
+    totalItems={allItems.length}
+    todoCount={todoCount}
+    doingCount={doingCount}
+    doneCount={doneCount}
+    initialNotes={clientNotes}
+  />
+
+  {months.length === 0 ? (
+    <p class="text-gray-500 text-sm">No months scheduled for this client.</p>
+  ) : (
+    <>
+      <div class="mb-8">
+        <Calendar client:load items={allItems} />
+      </div>
+      <PipelineLine
+        client:load
+        months={months}
+        initialItems={initialItems}
+        clientId={id}
+      />
+    </>
+  )}
+</Layout>
