@@ -1,6 +1,55 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
 
+export const DELETE: APIRoute = async ({ params }) => {
+  try {
+    const { id } = params;
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Client ID is required' }), { status: 400 });
+    }
+
+    const db = getDb();
+    const ref = db.collection('clients').doc(id);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
+    }
+
+    // Delete all related data in parallel
+    const [plansSnap, monthsSnap, itemsSnap] = await Promise.all([
+      db.collection('plans').where('clientId', '==', id).get(),
+      db.collection('months').where('clientId', '==', id).get(),
+      db.collection('content_items').where('clientId', '==', id).get(),
+    ]);
+
+    const BATCH_SIZE = 499;
+    const allRefs = [
+      ref,
+      ...plansSnap.docs.map((d) => d.ref),
+      ...monthsSnap.docs.map((d) => d.ref),
+      ...itemsSnap.docs.map((d) => d.ref),
+    ];
+
+    for (let i = 0; i < allRefs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      allRefs.slice(i, i + BATCH_SIZE).forEach((r) => batch.delete(r));
+      await batch.commit();
+    }
+
+    return new Response(JSON.stringify({ deleted: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Client delete error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      { status: 500 }
+    );
+  }
+};
+
 export const PATCH: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;

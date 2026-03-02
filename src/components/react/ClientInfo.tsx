@@ -39,6 +39,7 @@ export default function ClientInfo({
   const [active, setActive] = useState(initialActive);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const createdDate = new Date(createdAt).toLocaleDateString('en-US', {
@@ -52,6 +53,23 @@ export default function ClientInfo({
     month: 'long',
     year: 'numeric',
   });
+
+  async function handleDelete() {
+    if (!confirm(`Are you sure you want to delete "${clientName}"? This will permanently remove the client and all their scheduled content.`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+      if (res.ok) {
+        window.location.href = '/clients';
+      }
+    } catch {
+      // silent
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function toggleActive() {
     const newActive = !active;
@@ -113,6 +131,13 @@ export default function ClientInfo({
                 }`}
               >
                 {active ? 'Active' : 'Inactive'}
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-0.5">Created {createdDate}</p>
