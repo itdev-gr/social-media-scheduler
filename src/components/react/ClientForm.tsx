@@ -18,6 +18,7 @@ export default function ClientForm() {
   const [videosPerMonth, setVideosPerMonth] = useState(2);
   const [carouselsPerMonth, setCarouselsPerMonth] = useState(4);
   const [storiesPerMonth, setStoriesPerMonth] = useState(4);
+  const [notes, setNotes] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +42,7 @@ export default function ClientForm() {
           videosPerMonth,
           carouselsPerMonth,
           storiesPerMonth,
+          notes,
         }),
       });
 
@@ -101,7 +103,7 @@ export default function ClientForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Posts / month</label>
           <input
@@ -142,6 +144,17 @@ export default function ClientForm() {
             min={0}
           />
         </div>
+      </div>
+
+      <div>
+        <label className={labelClass}>Notes</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Add notes about this client..."
+          rows={3}
+          className={inputClass + ' resize-y'}
+        />
       </div>
 
       <button

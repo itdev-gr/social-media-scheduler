@@ -9,6 +9,7 @@ export interface Client {
   id?: string;
   name: string;
   createdAt: string; // ISO string
+  notes?: string;
 }
 
 export interface Plan {
@@ -53,6 +54,7 @@ export interface GenerateRequest {
   videosPerMonth: number;
   carouselsPerMonth: number;
   storiesPerMonth: number;
+  notes?: string;
 }
 
 export interface GenerateResponse {

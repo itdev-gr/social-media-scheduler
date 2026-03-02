@@ -38,7 +38,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Create client
     const clientRef = db.collection('clients').doc();
-    const client: Client = { name: body.clientName.trim(), createdAt: now };
+    const client: Client = { name: body.clientName.trim(), createdAt: now, notes: body.notes || '' };
     await clientRef.set(client);
     const clientId = clientRef.id;
 
