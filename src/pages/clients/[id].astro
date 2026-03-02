@@ -34,12 +34,13 @@ try {
   clientCreatedAt = clientData.createdAt;
   clientNotes = clientData.notes || '';
 
-  // Fetch plan for this client
-  const planSnap = await db
-    .collection('plans')
-    .where('clientId', '==', id)
-    .limit(1)
-    .get();
+  // Run all queries in parallel
+  const [planSnap, monthsSnap, allSnap] = await Promise.all([
+    db.collection('plans').where('clientId', '==', id).limit(1).get(),
+    db.collection('months').where('clientId', '==', id).orderBy('label', 'asc').get(),
+    db.collection('content_items').where('clientId', '==', id).get(),
+  ]);
+
   if (!planSnap.empty) {
     const p = planSnap.docs[0].data();
     planData = {
@@ -51,18 +52,7 @@ try {
     };
   }
 
-  const monthsSnap = await db
-    .collection('months')
-    .where('clientId', '==', id)
-    .orderBy('label', 'asc')
-    .get();
   months = monthsSnap.docs.map((d) => d.data().label);
-
-  // Fetch ALL content items for this client — single field filter, sort client-side
-  const allSnap = await db
-    .collection('content_items')
-    .where('clientId', '==', id)
-    .get();
 
   allItems = allSnap.docs
     .map((doc) => ({
@@ -114,7 +104,7 @@ try {
   ) : (
     <>
       <div class="mb-8">
-        <Calendar client:load items={allItems} />
+        <Calendar client:idle items={allItems} />
       </div>
       <PipelineLine
         client:load

@@ -2,6 +2,7 @@ import { initializeApp, cert, getApps, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
 let app: App;
+let db: Firestore;
 
 function getApp(): App {
   if (getApps().length === 0) {
@@ -22,5 +23,8 @@ function getApp(): App {
 }
 
 export function getDb(): Firestore {
-  return getFirestore(getApp());
+  if (!db) {
+    db = getFirestore(getApp());
+  }
+  return db;
 }

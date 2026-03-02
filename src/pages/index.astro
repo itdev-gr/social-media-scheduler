@@ -14,31 +14,29 @@ let calendarItems: any[] = [];
 try {
   const db = getDb();
 
-  const [clientsSnap, itemsSnap] = await Promise.all([
+  // Run all counts and queries in parallel
+  const [clientsSnap, itemsCountSnap, todoSnap, doingSnap, doneSnap, clientsListSnap, recentItemsSnap] = await Promise.all([
     db.collection('clients').count().get(),
-    db.collection('content_items').get(),
+    db.collection('content_items').count().get(),
+    db.collection('content_items').where('status', '==', 'todo').count().get(),
+    db.collection('content_items').where('status', '==', 'doing').count().get(),
+    db.collection('content_items').where('status', '==', 'done').count().get(),
+    db.collection('clients').get(),
+    db.collection('content_items').orderBy('scheduledDate', 'asc').limit(500).get(),
   ]);
 
   totalClients = clientsSnap.data().count;
-  totalItems = itemsSnap.size;
+  totalItems = itemsCountSnap.data().count;
+  todoItems = todoSnap.data().count;
+  doingItems = doingSnap.data().count;
+  doneItems = doneSnap.data().count;
 
-  // Collect client IDs for name lookup
-  const clientIds = [...new Set(itemsSnap.docs.map((d) => d.data().clientId))];
+  // Build client map from the single clients query
   const clientMap = new Map<string, string>();
-  for (let i = 0; i < clientIds.length; i += 30) {
-    const chunk = clientIds.slice(i, i + 30);
-    if (chunk.length === 0) continue;
-    const snap = await db.collection('clients').where('__name__', 'in', chunk).get();
-    snap.docs.forEach((d) => clientMap.set(d.id, d.data().name));
-  }
+  clientsListSnap.docs.forEach((d) => clientMap.set(d.id, d.data().name));
 
-  for (const doc of itemsSnap.docs) {
+  for (const doc of recentItemsSnap.docs) {
     const data = doc.data();
-    const status = data.status;
-    if (status === 'todo') todoItems++;
-    else if (status === 'doing') doingItems++;
-    else if (status === 'done') doneItems++;
-
     calendarItems.push({
       id: doc.id,
       type: data.type,
@@ -66,6 +64,6 @@ try {
     doneItems={doneItems}
   />
   <div class="mt-8">
-    <Calendar client:load items={calendarItems} />
+    <Calendar client:idle items={calendarItems} />
   </div>
 </Layout>

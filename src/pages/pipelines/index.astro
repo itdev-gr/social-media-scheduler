@@ -21,16 +21,18 @@ try {
       .orderBy('scheduledDate', 'asc')
       .get();
 
-    // Batch lookup clients
+    // Batch lookup clients (parallel)
     const clientIds = [...new Set(itemsSnap.docs.map((d) => d.data().clientId))];
     const clientMap = new Map<string, string>();
+    const chunks: string[][] = [];
     for (let i = 0; i < clientIds.length; i += 30) {
       const chunk = clientIds.slice(i, i + 30);
-      if (chunk.length === 0) continue;
-      const snap = await db
-        .collection('clients')
-        .where('__name__', 'in', chunk)
-        .get();
+      if (chunk.length > 0) chunks.push(chunk);
+    }
+    const clientSnaps = await Promise.all(
+      chunks.map((chunk) => db.collection('clients').where('__name__', 'in', chunk).get())
+    );
+    for (const snap of clientSnaps) {
       snap.docs.forEach((d) => clientMap.set(d.id, d.data().name));
     }
 

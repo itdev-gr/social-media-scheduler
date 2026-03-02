@@ -16,7 +16,10 @@ export const GET: APIRoute = async () => {
 
     return new Response(JSON.stringify(clients), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
     });
   } catch (error) {
     console.error('Clients error:', error);
