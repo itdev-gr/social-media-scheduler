@@ -1,0 +1,65 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import TaskDashboardCards from '../../components/react/TaskDashboardCards';
+import TaskCalendar from '../../components/react/TaskCalendar';
+import { getDb } from '../../lib/firebase-admin';
+
+let totalTasks = 0;
+let todoTasks = 0;
+let doingTasks = 0;
+let doneTasks = 0;
+let calendarItems: any[] = [];
+let clientsList: { id: string; name: string }[] = [];
+
+try {
+  const db = getDb();
+
+  const [totalSnap, todoSnap, doingSnap, doneSnap, clientsListSnap, tasksSnap] = await Promise.all([
+    db.collection('scheduled_tasks').count().get(),
+    db.collection('scheduled_tasks').where('status', '==', 'todo').count().get(),
+    db.collection('scheduled_tasks').where('status', '==', 'doing').count().get(),
+    db.collection('scheduled_tasks').where('status', '==', 'done').count().get(),
+    db.collection('clients').get(),
+    db.collection('scheduled_tasks').orderBy('scheduledDate', 'asc').limit(500).get(),
+  ]);
+
+  totalTasks = totalSnap.data().count;
+  todoTasks = todoSnap.data().count;
+  doingTasks = doingSnap.data().count;
+  doneTasks = doneSnap.data().count;
+
+  const clientMap = new Map<string, string>();
+  clientsListSnap.docs.forEach((d) => {
+    clientMap.set(d.id, d.data().name);
+    clientsList.push({ id: d.id, name: d.data().name });
+  });
+
+  for (const doc of tasksSnap.docs) {
+    const data = doc.data();
+    calendarItems.push({
+      id: doc.id,
+      title: data.title || 'Untitled Task',
+      status: data.status,
+      scheduledDate: data.scheduledDate,
+      clientId: data.clientId,
+      clientName: clientMap.get(data.clientId) || 'Unknown',
+    });
+  }
+} catch (e) {
+  // Firebase not configured yet or collection doesn't exist
+}
+---
+
+<Layout title="Task Dashboard">
+  <h2 class="text-2xl font-bold text-gray-900 mb-6">Task Dashboard</h2>
+  <TaskDashboardCards
+    client:load
+    totalTasks={totalTasks}
+    todoTasks={todoTasks}
+    doingTasks={doingTasks}
+    doneTasks={doneTasks}
+  />
+  <div class="mt-8">
+    <TaskCalendar client:idle items={calendarItems} clients={clientsList} />
+  </div>
+</Layout>

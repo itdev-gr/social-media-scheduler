@@ -8,10 +8,14 @@ interface Props {
 const { title = 'Social Media Manager' } = Astro.props;
 const pathname = Astro.url.pathname;
 
-const navLinks = [
+const postLinks = [
   { href: '/', label: 'Dashboard' },
   { href: '/clients', label: 'Clients' },
   { href: '/pipelines', label: 'Schedule' },
+];
+
+const taskLinks = [
+  { href: '/tasks', label: 'Dashboard' },
 ];
 ---
 
@@ -33,11 +37,29 @@ const navLinks = [
         <p class="text-xs text-gray-400 mt-1">Social Media Manager</p>
       </div>
       <nav class="flex-1 p-4 space-y-1">
-        {navLinks.map((link) => {
+        <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Post Scheduling</p>
+        {postLinks.map((link) => {
           const isActive =
             link.href === '/'
               ? pathname === '/'
               : pathname.startsWith(link.href);
+          return (
+            <a
+              href={link.href}
+              class:list={[
+                'block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+              ]}
+            >
+              {link.label}
+            </a>
+          );
+        })}
+        <p class="px-4 pt-6 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Task Scheduling</p>
+        {taskLinks.map((link) => {
+          const isActive = pathname.startsWith(link.href);
           return (
             <a
               href={link.href}
