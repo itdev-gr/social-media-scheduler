@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
-import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType } from '../../lib/types';
-import { generateMonthSequence } from '../../lib/date-utils';
+import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType, SchedulingSettings } from '../../lib/types';
+import { generateMonthSequence, addDays, parseMonthLabel, toMonthLabel } from '../../lib/date-utils';
 import { scheduleMonth } from '../../lib/scheduler';
 
 async function batchWrite(
@@ -35,6 +35,24 @@ export const POST: APIRoute = async ({ request }) => {
 
     const db = getDb();
     const now = new Date().toISOString();
+
+    // Fetch scheduling delay settings
+    const settingsDoc = await db.collection('settings').doc('scheduling').get();
+    const delays: SchedulingSettings = {
+      postDelayDays: 0,
+      videoDelayDays: 0,
+      carouselDelayDays: 0,
+      ...(settingsDoc.exists ? (settingsDoc.data() as Partial<SchedulingSettings>) : {}),
+    };
+
+    function getDelayForType(type: ContentType): number {
+      switch (type) {
+        case 'POST': return delays.postDelayDays;
+        case 'VIDEO': case 'SCENARIO': return delays.videoDelayDays;
+        case 'CAROUSEL': return delays.carouselDelayDays;
+        default: return 0;
+      }
+    }
 
     // Create client
     const clientRef = db.collection('clients').doc();
@@ -93,16 +111,22 @@ export const POST: APIRoute = async ({ request }) => {
         const currentNum = (typeCounters.get(item.type) || 0) + 1;
         typeCounters.set(item.type, currentNum);
 
+        const delay = getDelayForType(item.type);
+        const finalDate = delay > 0 ? addDays(item.date, delay) : item.date;
+        const parsed = parseMonthLabel(finalDate.substring(0, 7));
+        const finalMonthLabel = toMonthLabel(parsed.year, parsed.month);
+        const finalDay = parseInt(finalDate.substring(8, 10), 10);
+
         const contentRef = db.collection('content_items').doc();
         const contentItem: Omit<ContentItem, 'id'> = {
           clientId,
           planId,
           monthId,
-          monthLabel: m.label,
+          monthLabel: finalMonthLabel,
           type: item.type,
           number: currentNum,
-          scheduledDay: item.day,
-          scheduledDate: item.date,
+          scheduledDay: finalDay,
+          scheduledDate: finalDate,
           status: 'todo',
         };
         allContentWrites.push({ ref: contentRef, data: contentItem as Record<string, unknown> });

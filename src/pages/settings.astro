@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SchedulingSettings from '../components/react/SchedulingSettings';
+---
+
+<Layout title="Settings">
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+  <SchedulingSettings client:load />
+</Layout>

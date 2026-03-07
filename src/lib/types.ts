@@ -69,6 +69,13 @@ export interface GenerateResponse {
   contentItemsCreated: number;
 }
 
+// Scheduling delay settings
+export interface SchedulingSettings {
+  postDelayDays: number;
+  videoDelayDays: number;
+  carouselDelayDays: number;
+}
+
 // Scheduled item from the scheduler
 export interface ScheduledItem {
   type: ContentType;
