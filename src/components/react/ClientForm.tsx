@@ -7,7 +7,24 @@ interface GenerateResponse {
   contentItemsCreated: number;
 }
 
+interface Package {
+  name: string;
+  posts: number;
+  scenarios: number;
+  stories: number;
+  carousels: number;
+}
+
+const packages: Package[] = [
+  { name: 'Edit Only', posts: 4, scenarios: 4, stories: 0, carousels: 0 },
+  { name: 'Starter', posts: 2, scenarios: 4, stories: 0, carousels: 0 },
+  { name: 'Growth', posts: 4, scenarios: 8, stories: 4, carousels: 0 },
+  { name: 'Performance', posts: 8, scenarios: 12, stories: 8, carousels: 0 },
+  { name: 'Custom', posts: 0, scenarios: 0, stories: 0, carousels: 0 },
+];
+
 export default function ClientForm() {
+  const [selectedPackage, setSelectedPackage] = useState('');
   const [clientName, setClientName] = useState('');
   const [clickupId, setClickupId] = useState('');
   const [startMonth, setStartMonth] = useState(() => {
@@ -15,11 +32,22 @@ export default function ClientForm() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [monthsCount, setMonthsCount] = useState(3);
-  const [postsPerMonth, setPostsPerMonth] = useState(8);
-  const [scenariosPerMonth, setScenariosPerMonth] = useState(2);
-  const [carouselsPerMonth, setCarouselsPerMonth] = useState(4);
-  const [storiesPerMonth, setStoriesPerMonth] = useState(4);
+  const [postsPerMonth, setPostsPerMonth] = useState(0);
+  const [scenariosPerMonth, setScenariosPerMonth] = useState(0);
+  const [carouselsPerMonth, setCarouselsPerMonth] = useState(0);
+  const [storiesPerMonth, setStoriesPerMonth] = useState(0);
   const [notes, setNotes] = useState('');
+
+  function handlePackageChange(packageName: string) {
+    setSelectedPackage(packageName);
+    const pkg = packages.find((p) => p.name === packageName);
+    if (pkg) {
+      setPostsPerMonth(pkg.posts);
+      setScenariosPerMonth(pkg.scenarios);
+      setStoriesPerMonth(pkg.stories);
+      setCarouselsPerMonth(pkg.carousels);
+    }
+  }
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -89,6 +117,22 @@ export default function ClientForm() {
           className={inputClass}
           placeholder="e.g. abc123xyz"
         />
+      </div>
+
+      <div>
+        <label className={labelClass}>Package</label>
+        <select
+          value={selectedPackage}
+          onChange={(e) => handlePackageChange(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select a package...</option>
+          {packages.map((pkg) => (
+            <option key={pkg.name} value={pkg.name}>
+              {pkg.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
