@@ -1,25 +1,41 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
-import type { SchedulingSettings } from '../../lib/types';
+import type { SchedulingSettings, PackageDelays } from '../../lib/types';
+import { PACKAGE_NAMES } from '../../lib/types';
 
 const SETTINGS_DOC_ID = 'scheduling';
-const DEFAULTS: SchedulingSettings = {
+
+const DEFAULT_DELAYS: PackageDelays = {
   postDelayDays: 0,
   videoDelayDays: 0,
   carouselDelayDays: 0,
   storyDelayDays: 0,
 };
 
+function buildDefaults(): SchedulingSettings {
+  const settings = {} as SchedulingSettings;
+  for (const name of PACKAGE_NAMES) {
+    settings[name] = { ...DEFAULT_DELAYS };
+  }
+  return settings;
+}
+
 export const GET: APIRoute = async () => {
   try {
     const db = getDb();
     const doc = await db.collection('settings').doc(SETTINGS_DOC_ID).get();
+    const defaults = buildDefaults();
 
-    const settings: SchedulingSettings = doc.exists
-      ? { ...DEFAULTS, ...(doc.data() as Partial<SchedulingSettings>) }
-      : DEFAULTS;
+    if (doc.exists) {
+      const data = doc.data() as Record<string, unknown>;
+      for (const name of PACKAGE_NAMES) {
+        if (data[name] && typeof data[name] === 'object') {
+          defaults[name] = { ...DEFAULT_DELAYS, ...(data[name] as Partial<PackageDelays>) };
+        }
+      }
+    }
 
-    return new Response(JSON.stringify(settings), {
+    return new Response(JSON.stringify(defaults), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -35,19 +51,18 @@ export const GET: APIRoute = async () => {
 export const PATCH: APIRoute = async ({ request }) => {
   try {
     const body = (await request.json()) as Partial<SchedulingSettings>;
+    const updates: Record<string, PackageDelays> = {};
 
-    const updates: Partial<SchedulingSettings> = {};
-    if (body.postDelayDays !== undefined) {
-      updates.postDelayDays = Math.max(0, Math.floor(body.postDelayDays));
-    }
-    if (body.videoDelayDays !== undefined) {
-      updates.videoDelayDays = Math.max(0, Math.floor(body.videoDelayDays));
-    }
-    if (body.carouselDelayDays !== undefined) {
-      updates.carouselDelayDays = Math.max(0, Math.floor(body.carouselDelayDays));
-    }
-    if (body.storyDelayDays !== undefined) {
-      updates.storyDelayDays = Math.max(0, Math.floor(body.storyDelayDays));
+    for (const name of PACKAGE_NAMES) {
+      if (body[name]) {
+        const pkg = body[name];
+        updates[name] = {
+          postDelayDays: Math.max(0, Math.floor(pkg.postDelayDays ?? 0)),
+          videoDelayDays: Math.max(0, Math.floor(pkg.videoDelayDays ?? 0)),
+          carouselDelayDays: Math.max(0, Math.floor(pkg.carouselDelayDays ?? 0)),
+          storyDelayDays: Math.max(0, Math.floor(pkg.storyDelayDays ?? 0)),
+        };
+      }
     }
 
     const db = getDb();
@@ -55,9 +70,17 @@ export const PATCH: APIRoute = async ({ request }) => {
     await ref.set(updates, { merge: true });
 
     const doc = await ref.get();
-    const settings: SchedulingSettings = { ...DEFAULTS, ...(doc.data() as Partial<SchedulingSettings>) };
+    const defaults = buildDefaults();
+    if (doc.exists) {
+      const data = doc.data() as Record<string, unknown>;
+      for (const name of PACKAGE_NAMES) {
+        if (data[name] && typeof data[name] === 'object') {
+          defaults[name] = { ...DEFAULT_DELAYS, ...(data[name] as Partial<PackageDelays>) };
+        }
+      }
+    }
 
-    return new Response(JSON.stringify(settings), {
+    return new Response(JSON.stringify(defaults), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

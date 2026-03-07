@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
-import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType, SchedulingSettings } from '../../lib/types';
+import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType, PackageDelays, PackageName } from '../../lib/types';
+import { PACKAGE_NAMES } from '../../lib/types';
 import { generateMonthSequence, addDays, daysInMonth } from '../../lib/date-utils';
 import { scheduleMonth, type MonthStartDays } from '../../lib/scheduler';
 
@@ -37,15 +38,24 @@ export const POST: APIRoute = async ({ request }) => {
     const db = getDb();
     const now = new Date().toISOString();
 
-    // Fetch scheduling delay settings
-    const settingsDoc = await db.collection('settings').doc('scheduling').get();
-    const delays: SchedulingSettings = {
+    // Fetch scheduling delay settings for the selected package
+    const defaultDelays: PackageDelays = {
       postDelayDays: 0,
       videoDelayDays: 0,
       carouselDelayDays: 0,
       storyDelayDays: 0,
-      ...(settingsDoc.exists ? (settingsDoc.data() as Partial<SchedulingSettings>) : {}),
     };
+    let delays = defaultDelays;
+    const pkgName = body.packageName as PackageName | undefined;
+    if (pkgName && PACKAGE_NAMES.includes(pkgName)) {
+      const settingsDoc = await db.collection('settings').doc('scheduling').get();
+      if (settingsDoc.exists) {
+        const data = settingsDoc.data() as Record<string, unknown>;
+        if (data[pkgName] && typeof data[pkgName] === 'object') {
+          delays = { ...defaultDelays, ...(data[pkgName] as Partial<PackageDelays>) };
+        }
+      }
+    }
 
     // Create client
     const clientRef = db.collection('clients').doc();

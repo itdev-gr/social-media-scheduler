@@ -1,13 +1,31 @@
 import { useState, useEffect } from 'react';
-import type { SchedulingSettings } from '../../lib/types';
+import type { SchedulingSettings, PackageDelays, PackageName } from '../../lib/types';
+import { PACKAGE_NAMES } from '../../lib/types';
+
+const DEFAULT_DELAYS: PackageDelays = {
+  postDelayDays: 0,
+  videoDelayDays: 0,
+  carouselDelayDays: 0,
+  storyDelayDays: 0,
+};
+
+function buildDefaults(): SchedulingSettings {
+  const settings = {} as SchedulingSettings;
+  for (const name of PACKAGE_NAMES) {
+    settings[name] = { ...DEFAULT_DELAYS };
+  }
+  return settings;
+}
+
+const delayFields: { key: keyof PackageDelays; label: string }[] = [
+  { key: 'postDelayDays', label: 'Post delay (days)' },
+  { key: 'videoDelayDays', label: 'Video delay (days)' },
+  { key: 'carouselDelayDays', label: 'Carousel delay (days)' },
+  { key: 'storyDelayDays', label: 'Story delay (days)' },
+];
 
 export default function SchedulingSettingsForm() {
-  const [settings, setSettings] = useState<SchedulingSettings>({
-    postDelayDays: 0,
-    videoDelayDays: 0,
-    carouselDelayDays: 0,
-    storyDelayDays: 0,
-  });
+  const [settings, setSettings] = useState<SchedulingSettings>(buildDefaults);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -19,6 +37,13 @@ export default function SchedulingSettingsForm() {
       .catch(() => setMessage({ type: 'error', text: 'Failed to load settings' }))
       .finally(() => setLoading(false));
   }, []);
+
+  function updateField(pkg: PackageName, key: keyof PackageDelays, value: number) {
+    setSettings((prev) => ({
+      ...prev,
+      [pkg]: { ...prev[pkg], [key]: Math.max(0, value) },
+    }));
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -54,39 +79,35 @@ export default function SchedulingSettingsForm() {
     return <p className="text-sm text-gray-500">Loading settings...</p>;
   }
 
-  const fields: { key: keyof SchedulingSettings; label: string }[] = [
-    { key: 'postDelayDays', label: 'Post start delay (days)' },
-    { key: 'videoDelayDays', label: 'Video start delay (days)' },
-    { key: 'carouselDelayDays', label: 'Carousel start delay (days)' },
-    { key: 'storyDelayDays', label: 'Story start delay (days)' },
-  ];
-
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-2xl space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Scheduling Delays</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Scheduling Delays per Package</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Set how many days after project creation each content type should start being scheduled.
-          A value of 0 means scheduling starts on the same day.
+          Set how many days after client start date each content type should begin scheduling, per package.
+          A value of 0 means scheduling starts on the start date.
         </p>
       </div>
 
-      <div className="space-y-4">
-        {fields.map(({ key, label }) => (
-          <div key={key}>
-            <label className={labelClass}>{label}</label>
-            <input
-              type="number"
-              value={settings[key]}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, [key]: Math.max(0, Number(e.target.value)) }))
-              }
-              className={inputClass}
-              min={0}
-            />
+      {PACKAGE_NAMES.map((pkg) => (
+        <div key={pkg} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-900">{pkg}</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {delayFields.map(({ key, label }) => (
+              <div key={key}>
+                <label className={labelClass}>{label}</label>
+                <input
+                  type="number"
+                  value={settings[pkg][key]}
+                  onChange={(e) => updateField(pkg, key, Number(e.target.value))}
+                  className={inputClass}
+                  min={0}
+                />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
 
       <button
         onClick={handleSave}

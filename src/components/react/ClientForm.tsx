@@ -66,6 +66,7 @@ export default function ClientForm() {
         body: JSON.stringify({
           clientName,
           clickupId,
+          packageName: selectedPackage || undefined,
           startDate,
           monthsCount,
           postsPerMonth,

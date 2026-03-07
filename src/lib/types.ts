@@ -52,6 +52,7 @@ export interface ContentItem {
 // API request/response
 export interface GenerateRequest {
   clientName: string;
+  packageName?: string;
   startDate: string; // YYYY-MM-DD
   monthsCount: number;
   postsPerMonth: number;
@@ -69,13 +70,19 @@ export interface GenerateResponse {
   contentItemsCreated: number;
 }
 
-// Scheduling delay settings
-export interface SchedulingSettings {
+// Scheduling delay settings per package
+export interface PackageDelays {
   postDelayDays: number;
   videoDelayDays: number;
   carouselDelayDays: number;
   storyDelayDays: number;
 }
+
+export const PACKAGE_NAMES = ['Edit Only', 'Starter', 'Growth', 'Performance', 'Custom'] as const;
+export type PackageName = typeof PACKAGE_NAMES[number];
+
+// Map of package name → delays
+export type SchedulingSettings = Record<PackageName, PackageDelays>;
 
 // Scheduled item from the scheduler
 export interface ScheduledItem {
