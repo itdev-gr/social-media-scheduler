@@ -7,6 +7,7 @@ const DEFAULTS: SchedulingSettings = {
   postDelayDays: 0,
   videoDelayDays: 0,
   carouselDelayDays: 0,
+  storyDelayDays: 0,
 };
 
 export const GET: APIRoute = async () => {
@@ -44,6 +45,9 @@ export const PATCH: APIRoute = async ({ request }) => {
     }
     if (body.carouselDelayDays !== undefined) {
       updates.carouselDelayDays = Math.max(0, Math.floor(body.carouselDelayDays));
+    }
+    if (body.storyDelayDays !== undefined) {
+      updates.storyDelayDays = Math.max(0, Math.floor(body.storyDelayDays));
     }
 
     const db = getDb();

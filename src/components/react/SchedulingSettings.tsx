@@ -6,6 +6,7 @@ export default function SchedulingSettingsForm() {
     postDelayDays: 0,
     videoDelayDays: 0,
     carouselDelayDays: 0,
+    storyDelayDays: 0,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,6 +58,7 @@ export default function SchedulingSettingsForm() {
     { key: 'postDelayDays', label: 'Post start delay (days)' },
     { key: 'videoDelayDays', label: 'Video start delay (days)' },
     { key: 'carouselDelayDays', label: 'Carousel start delay (days)' },
+    { key: 'storyDelayDays', label: 'Story start delay (days)' },
   ];
 
   return (

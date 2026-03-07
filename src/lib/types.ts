@@ -74,6 +74,7 @@ export interface SchedulingSettings {
   postDelayDays: number;
   videoDelayDays: number;
   carouselDelayDays: number;
+  storyDelayDays: number;
 }
 
 // Scheduled item from the scheduler

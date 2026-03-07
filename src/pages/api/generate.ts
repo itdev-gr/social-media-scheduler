@@ -42,6 +42,7 @@ export const POST: APIRoute = async ({ request }) => {
       postDelayDays: 0,
       videoDelayDays: 0,
       carouselDelayDays: 0,
+      storyDelayDays: 0,
       ...(settingsDoc.exists ? (settingsDoc.data() as Partial<SchedulingSettings>) : {}),
     };
 
@@ -75,7 +76,7 @@ export const POST: APIRoute = async ({ request }) => {
     const postStartDate = addDays(todayStr, delays.postDelayDays);
     const videoStartDate = addDays(todayStr, delays.videoDelayDays);   // also used for scenarios
     const carouselStartDate = addDays(todayStr, delays.carouselDelayDays);
-    const storyStartDate = todayStr; // stories have no delay setting
+    const storyStartDate = addDays(todayStr, delays.storyDelayDays);
 
     // Helper: given an effective start date (YYYY-MM-DD) and a month (year, month),
     // returns the day-of-month from which scheduling should begin.
