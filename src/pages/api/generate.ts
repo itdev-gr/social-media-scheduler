@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
 import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType, SchedulingSettings } from '../../lib/types';
-import { generateMonthSequence, addDays, parseMonthLabel, toMonthLabel } from '../../lib/date-utils';
-import { scheduleMonth } from '../../lib/scheduler';
+import { generateMonthSequence, addDays, daysInMonth } from '../../lib/date-utils';
+import { scheduleMonth, type MonthStartDays } from '../../lib/scheduler';
 
 async function batchWrite(
   db: FirebaseFirestore.Firestore,
@@ -45,15 +45,6 @@ export const POST: APIRoute = async ({ request }) => {
       ...(settingsDoc.exists ? (settingsDoc.data() as Partial<SchedulingSettings>) : {}),
     };
 
-    function getDelayForType(type: ContentType): number {
-      switch (type) {
-        case 'POST': return delays.postDelayDays;
-        case 'VIDEO': case 'SCENARIO': return delays.videoDelayDays;
-        case 'CAROUSEL': return delays.carouselDelayDays;
-        default: return 0;
-      }
-    }
-
     // Create client
     const clientRef = db.collection('clients').doc();
     const client: Client = { name: body.clientName.trim(), createdAt: now, notes: body.notes || '', clickupId: body.clickupId || '' };
@@ -78,19 +69,28 @@ export const POST: APIRoute = async ({ request }) => {
     // Generate month sequence
     const months = generateMonthSequence(body.startMonth, body.monthsCount);
 
-    // Use today as the base date for scheduling; delays are relative to today
+    // ── Step 1: Calculate effective start dates per content type ──
+    // Start date = today + delay (from settings)
     const todayStr = now.substring(0, 10); // YYYY-MM-DD
-    const startMonthFirstDay = `${body.startMonth}-01`;
+    const postStartDate = addDays(todayStr, delays.postDelayDays);
+    const videoStartDate = addDays(todayStr, delays.videoDelayDays);   // also used for scenarios
+    const carouselStartDate = addDays(todayStr, delays.carouselDelayDays);
+    const storyStartDate = todayStr; // stories have no delay setting
 
-    // Calculate days between start of first month and today
-    function daysBetween(dateA: string, dateB: string): number {
-      const a = new Date(dateA + 'T00:00:00Z').getTime();
-      const b = new Date(dateB + 'T00:00:00Z').getTime();
-      return Math.round((b - a) / (1000 * 60 * 60 * 24));
+    // Helper: given an effective start date (YYYY-MM-DD) and a month (year, month),
+    // returns the day-of-month from which scheduling should begin.
+    // If the start date is before this month → 1 (full month available).
+    // If the start date is within this month → that day.
+    // If the start date is after this month → totalDays+1 (skip entirely).
+    function getFromDay(startDate: string, year: number, month: number, totalDays: number): number {
+      const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+      const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`;
+      if (startDate <= monthStart) return 1;
+      if (startDate > monthEnd) return totalDays + 1;
+      return parseInt(startDate.substring(8, 10), 10);
     }
 
-    const baseDiffDays = daysBetween(startMonthFirstDay, todayStr);
-
+    // ── Step 2: Schedule content using the calculated start dates ──
     const allContentWrites: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
     let contentItemsCreated = 0;
 
@@ -110,40 +110,40 @@ export const POST: APIRoute = async ({ request }) => {
       await monthRef.set(monthDoc);
       const monthId = monthRef.id;
 
-      // Schedule content for this month
+      // Calculate per-type start days for this month based on pre-calculated dates
+      const totalDays = daysInMonth(m.year, m.month);
+      const startDays: MonthStartDays = {
+        posts: getFromDay(postStartDate, m.year, m.month, totalDays),
+        scenarios: getFromDay(videoStartDate, m.year, m.month, totalDays),
+        carousels: getFromDay(carouselStartDate, m.year, m.month, totalDays),
+        stories: getFromDay(storyStartDate, m.year, m.month, totalDays),
+      };
+
+      // Schedule content for this month using the calculated start days
       const scheduledItems = scheduleMonth(
         m.year,
         m.month,
         body.postsPerMonth || 0,
         body.scenariosPerMonth || 0,
         body.carouselsPerMonth || 0,
-        body.storiesPerMonth || 0
+        body.storiesPerMonth || 0,
+        startDays
       );
 
       for (const item of scheduledItems) {
         const currentNum = (typeCounters.get(item.type) || 0) + 1;
         typeCounters.set(item.type, currentNum);
 
-        // Each item has an original offset from the start of startMonth.
-        // Rebase it so the schedule starts from today + delay instead.
-        const originalOffset = daysBetween(startMonthFirstDay, item.date);
-        const delay = getDelayForType(item.type);
-        const totalOffset = originalOffset - baseDiffDays + delay;
-        const finalDate = addDays(todayStr, Math.max(0, totalOffset));
-        const parsed = parseMonthLabel(finalDate.substring(0, 7));
-        const finalMonthLabel = toMonthLabel(parsed.year, parsed.month);
-        const finalDay = parseInt(finalDate.substring(8, 10), 10);
-
         const contentRef = db.collection('content_items').doc();
         const contentItem: Omit<ContentItem, 'id'> = {
           clientId,
           planId,
           monthId,
-          monthLabel: finalMonthLabel,
+          monthLabel: m.label,
           type: item.type,
           number: currentNum,
-          scheduledDay: finalDay,
-          scheduledDate: finalDate,
+          scheduledDay: item.day,
+          scheduledDate: item.date,
           status: 'todo',
         };
         allContentWrites.push({ ref: contentRef, data: contentItem as Record<string, unknown> });
