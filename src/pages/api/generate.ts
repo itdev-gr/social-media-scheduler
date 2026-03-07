@@ -78,6 +78,19 @@ export const POST: APIRoute = async ({ request }) => {
     // Generate month sequence
     const months = generateMonthSequence(body.startMonth, body.monthsCount);
 
+    // Use today as the base date for scheduling; delays are relative to today
+    const todayStr = now.substring(0, 10); // YYYY-MM-DD
+    const startMonthFirstDay = `${body.startMonth}-01`;
+
+    // Calculate days between start of first month and today
+    function daysBetween(dateA: string, dateB: string): number {
+      const a = new Date(dateA + 'T00:00:00Z').getTime();
+      const b = new Date(dateB + 'T00:00:00Z').getTime();
+      return Math.round((b - a) / (1000 * 60 * 60 * 24));
+    }
+
+    const baseDiffDays = daysBetween(startMonthFirstDay, todayStr);
+
     const allContentWrites: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
     let contentItemsCreated = 0;
 
@@ -111,8 +124,12 @@ export const POST: APIRoute = async ({ request }) => {
         const currentNum = (typeCounters.get(item.type) || 0) + 1;
         typeCounters.set(item.type, currentNum);
 
+        // Each item has an original offset from the start of startMonth.
+        // Rebase it so the schedule starts from today + delay instead.
+        const originalOffset = daysBetween(startMonthFirstDay, item.date);
         const delay = getDelayForType(item.type);
-        const finalDate = delay > 0 ? addDays(item.date, delay) : item.date;
+        const totalOffset = originalOffset - baseDiffDays + delay;
+        const finalDate = addDays(todayStr, Math.max(0, totalOffset));
         const parsed = parseMonthLabel(finalDate.substring(0, 7));
         const finalMonthLabel = toMonthLabel(parsed.year, parsed.month);
         const finalDay = parseInt(finalDate.substring(8, 10), 10);
