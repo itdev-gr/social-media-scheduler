@@ -3,7 +3,7 @@ import { getDb } from '../../../lib/firebase-admin';
 import type { ContentStatus, ContentType } from '../../../lib/types';
 
 const VALID_STATUSES: ContentStatus[] = ['todo', 'doing', 'done'];
-const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY', 'SCENARIO'];
+const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 
 export const PATCH: APIRoute = async ({ params, request }) => {
   try {

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
 import type { ContentType, ContentStatus } from '../../lib/types';
 
-const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY', 'SCENARIO'];
+const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const VALID_STATUSES: ContentStatus[] = ['todo', 'doing', 'done'];
 
 export const POST: APIRoute = async ({ request }) => {

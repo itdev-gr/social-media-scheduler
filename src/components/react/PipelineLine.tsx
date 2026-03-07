@@ -3,7 +3,7 @@ import MonthSelector from './MonthSelector';
 import PipelineItem from './PipelineItem';
 
 type ContentStatus = 'todo' | 'doing' | 'done';
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 
 interface ContentItemData {
   id: string;
@@ -52,7 +52,7 @@ export default function PipelineLine({ months, initialItems, clientId }: Props) 
     fetchItems();
   }, [selectedMonth, clientId]);
 
-  const activeItems = items.filter((i) => i.status !== 'done');
+  const activeItems = items.filter((i) => i.status !== 'done' && i.type !== 'SCENARIO');
   const grouped = groupByDate(activeItems);
 
   function handleStatusChange(id: string, newStatus: ContentStatus) {

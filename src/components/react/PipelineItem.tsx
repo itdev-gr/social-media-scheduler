@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 type ContentStatus = 'todo' | 'doing' | 'done';
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 
 interface ContentItemData {
   id: string;
@@ -30,7 +30,6 @@ const CONTENT_COLORS: Record<ContentType, string> = {
   VIDEO: 'bg-purple-100 text-purple-700',
   CAROUSEL: 'bg-orange-100 text-orange-700',
   STORY: 'bg-pink-100 text-pink-700',
-  SCENARIO: 'bg-teal-100 text-teal-700',
 };
 
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];

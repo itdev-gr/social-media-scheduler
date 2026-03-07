@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 
-type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
+type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 type ContentStatus = 'todo' | 'doing' | 'done';
 type ViewMode = 'month' | 'week';
 
@@ -34,7 +34,6 @@ const CONTENT_COLORS: Record<ContentType, string> = {
   VIDEO: 'bg-purple-500',
   CAROUSEL: 'bg-orange-500',
   STORY: 'bg-pink-500',
-  SCENARIO: 'bg-teal-500',
 };
 
 const STATUS_RING: Record<ContentStatus, string> = {
@@ -49,7 +48,7 @@ const STATUS_COLORS: Record<ContentStatus, string> = {
   done: 'bg-green-100 text-green-700',
 };
 
-const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY', 'SCENARIO'];
+const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -67,7 +66,9 @@ function getMonday(d: Date): Date {
 
 export default function Calendar({ items: initialItems, clientId, clientName, clients }: Props) {
   const canCreate = !!(clientId || (clients && clients.length > 0));
-  const [items, setItems] = useState<CalendarItem[]>(initialItems);
+  const [items, setItems] = useState<CalendarItem[]>(() =>
+    initialItems.filter((item) => item.type !== 'SCENARIO')
+  );
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
