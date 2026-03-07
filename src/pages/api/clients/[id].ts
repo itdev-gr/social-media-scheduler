@@ -23,10 +23,11 @@ export const POST: APIRoute = async ({ params, request }) => {
     }
 
     // Delete all related data in parallel
-    const [plansSnap, monthsSnap, itemsSnap] = await Promise.all([
+    const [plansSnap, monthsSnap, itemsSnap, scheduledTasksSnap] = await Promise.all([
       db.collection('plans').where('clientId', '==', id).get(),
       db.collection('months').where('clientId', '==', id).get(),
       db.collection('content_items').where('clientId', '==', id).get(),
+      db.collection('scheduled_tasks').where('clientId', '==', id).get(),
     ]);
 
     const BATCH_SIZE = 499;
@@ -35,6 +36,7 @@ export const POST: APIRoute = async ({ params, request }) => {
       ...plansSnap.docs.map((d) => d.ref),
       ...monthsSnap.docs.map((d) => d.ref),
       ...itemsSnap.docs.map((d) => d.ref),
+      ...scheduledTasksSnap.docs.map((d) => d.ref),
     ];
 
     for (let i = 0; i < allRefs.length; i += BATCH_SIZE) {

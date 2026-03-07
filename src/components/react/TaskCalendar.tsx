@@ -59,7 +59,99 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [activeStatuses, setActiveStatuses] = useState<Set<TaskStatus>>(new Set(STATUS_OPTIONS));
 
+  // Edit modal state
+  const [selected, setSelected] = useState<TaskItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editStatus, setEditStatus] = useState<TaskStatus>('todo');
+  const [editDate, setEditDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
   const { year, month } = currentDate;
+
+  function openModal(item: TaskItem) {
+    setSelected(item);
+    setEditTitle(item.title);
+    setEditStatus(item.status);
+    setEditDate(item.scheduledDate);
+    setSaveError('');
+  }
+
+  function closeModal() {
+    setSelected(null);
+    setSaveError('');
+  }
+
+  async function handleSave() {
+    if (!selected) return;
+    setSaving(true);
+    setSaveError('');
+
+    const updates: Record<string, string> = {};
+    if (editTitle !== selected.title) updates.title = editTitle;
+    if (editStatus !== selected.status) updates.status = editStatus;
+    if (editDate !== selected.scheduledDate) updates.scheduledDate = editDate;
+
+    if (Object.keys(updates).length === 0) {
+      closeModal();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/scheduled-tasks/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setSaveError(data.error || 'Failed to save');
+        setSaving(false);
+        return;
+      }
+
+      setItems((all) =>
+        all.map((i) =>
+          i.id === selected.id
+            ? { ...i, title: editTitle, status: editStatus, scheduledDate: editDate }
+            : i
+        )
+      );
+      closeModal();
+    } catch {
+      setSaveError('Network error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!selected) return;
+    setDeleting(true);
+    setSaveError('');
+
+    try {
+      const res = await fetch(`/api/scheduled-tasks/${selected.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setSaveError(data.error || 'Failed to delete');
+        setDeleting(false);
+        return;
+      }
+
+      setItems((all) => all.filter((i) => i.id !== selected.id));
+      closeModal();
+    } catch {
+      setSaveError('Network error');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function prevMonth() {
     setCurrentDate((d) => {
@@ -165,167 +257,275 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
     return `${startMonth} – ${endMonth}`;
   })();
 
+  const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none';
+  const labelClass = 'block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5';
+
   function renderTaskChip(item: TaskItem) {
     return (
-      <div
+      <button
         key={item.id}
-        className={`w-full text-left text-[10px] font-medium text-white px-1.5 py-0.5 rounded truncate ${STATUS_COLORS[item.status]}`}
+        onClick={() => openModal(item)}
+        className={`w-full text-left text-[10px] font-medium text-white px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity ${STATUS_COLORS[item.status]}`}
       >
         {item.title} · {item.clientName}
-      </div>
+      </button>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={viewMode === 'month' ? prevMonth : prevWeek}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h3 className="text-lg font-semibold text-gray-900 min-w-[200px] text-center">
-            {viewMode === 'month' ? monthLabel : weekLabel}
-          </h3>
-          <button
-            onClick={viewMode === 'month' ? nextMonth : nextWeek}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={goToToday}
-            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            Today
-          </button>
-          <div className="flex bg-gray-100 rounded-lg p-0.5">
+    <>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setViewMode('month')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                viewMode === 'month'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              onClick={viewMode === 'month' ? prevMonth : prevWeek}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
             >
-              Month
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
+            <h3 className="text-lg font-semibold text-gray-900 min-w-[200px] text-center">
+              {viewMode === 'month' ? monthLabel : weekLabel}
+            </h3>
             <button
-              onClick={() => setViewMode('week')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                viewMode === 'week'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              onClick={viewMode === 'month' ? nextMonth : nextWeek}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
             >
-              Week
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Month View */}
-      {viewMode === 'month' && (
-        <>
-          <div className="grid grid-cols-7 border-b border-gray-200">
-            {DAYS.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToToday}
+              className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Today
+            </button>
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('month')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  viewMode === 'month'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Month
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  viewMode === 'week'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Week
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-7">
-            {monthCells.map((cell, i) => {
-              const dayItems = cell.dateStr ? itemsByDate.get(cell.dateStr) || [] : [];
-              const isToday = cell.dateStr === todayStr;
-              return (
-                <div
-                  key={i}
-                  className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 ${cell.day === null ? 'bg-gray-50' : ''}`}
-                >
-                  {cell.day !== null && (
-                    <>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
-                          {cell.day}
+        </div>
+
+        {/* Month View */}
+        {viewMode === 'month' && (
+          <>
+            <div className="grid grid-cols-7 border-b border-gray-200">
+              {DAYS.map((d) => (
+                <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {monthCells.map((cell, i) => {
+                const dayItems = cell.dateStr ? itemsByDate.get(cell.dateStr) || [] : [];
+                const isToday = cell.dateStr === todayStr;
+                return (
+                  <div
+                    key={i}
+                    className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 ${cell.day === null ? 'bg-gray-50' : ''}`}
+                  >
+                    {cell.day !== null && (
+                      <>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
+                            {cell.day}
+                          </div>
                         </div>
-                      </div>
-                      <div className="space-y-1">
-                        {dayItems.map((item) => renderTaskChip(item))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Week View */}
-      {viewMode === 'week' && (
-        <>
-          <div className="grid grid-cols-7 border-b border-gray-200">
-            {weekDays.map((wd) => {
-              const isToday = wd.dateStr === todayStr;
-              return (
-                <div key={wd.dateStr} className="py-2 text-center">
-                  <div className="text-xs font-medium text-gray-500">{wd.dayName}</div>
-                  <div className={`text-sm font-semibold mt-0.5 w-7 h-7 flex items-center justify-center rounded-full mx-auto ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-900'}`}>
-                    {wd.dayNum}
+                        <div className="space-y-1">
+                          {dayItems.map((item) => renderTaskChip(item))}
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-7">
-            {weekDays.map((wd) => {
-              const dayItems = itemsByDate.get(wd.dateStr) || [];
-              return (
-                <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2">
-                  <div className="space-y-1.5">
-                    {dayItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`w-full text-left px-2 py-1.5 rounded-lg ${STATUS_COLORS[item.status]}`}
-                      >
-                        <div className="text-[11px] font-semibold text-white">{item.title}</div>
-                        <div className="text-[10px] text-white/80 truncate">{item.clientName}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+                );
+              })}
+            </div>
+          </>
+        )}
 
-      {/* Filters */}
-      <div className="px-6 py-3 border-t border-gray-200 flex gap-2 flex-wrap">
-        {STATUS_OPTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => toggleStatus(s)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-              activeStatuses.has(s)
-                ? STATUS_BADGE[s] + ' ring-2 ring-offset-1 ring-gray-200'
-                : 'bg-gray-100 text-gray-400 line-through'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${activeStatuses.has(s) ? STATUS_COLORS[s] : 'bg-gray-300'}`} />
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+        {/* Week View */}
+        {viewMode === 'week' && (
+          <>
+            <div className="grid grid-cols-7 border-b border-gray-200">
+              {weekDays.map((wd) => {
+                const isToday = wd.dateStr === todayStr;
+                return (
+                  <div key={wd.dateStr} className="py-2 text-center">
+                    <div className="text-xs font-medium text-gray-500">{wd.dayName}</div>
+                    <div className={`text-sm font-semibold mt-0.5 w-7 h-7 flex items-center justify-center rounded-full mx-auto ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-900'}`}>
+                      {wd.dayNum}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-7">
+              {weekDays.map((wd) => {
+                const dayItems = itemsByDate.get(wd.dateStr) || [];
+                return (
+                  <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2">
+                    <div className="space-y-1.5">
+                      {dayItems.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => openModal(item)}
+                          className={`w-full text-left px-2 py-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${STATUS_COLORS[item.status]}`}
+                        >
+                          <div className="text-[11px] font-semibold text-white">{item.title}</div>
+                          <div className="text-[10px] text-white/80 truncate">{item.clientName}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Filters */}
+        <div className="px-6 py-3 border-t border-gray-200 flex gap-2 flex-wrap">
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => toggleStatus(s)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                activeStatuses.has(s)
+                  ? STATUS_BADGE[s] + ' ring-2 ring-offset-1 ring-gray-200'
+                  : 'bg-gray-100 text-gray-400 line-through'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${activeStatuses.has(s) ? STATUS_COLORS[s] : 'bg-gray-300'}`} />
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {/* Edit / Delete Modal */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={closeModal}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Edit Task</h3>
+              <button
+                onClick={closeModal}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className={labelClass}>Client</label>
+                <p className="text-sm font-semibold text-gray-900">{selected.clientName}</p>
+              </div>
+
+              <div>
+                <label className={labelClass}>Title</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Scheduled Date</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Status</label>
+                <div className="flex gap-2">
+                  {STATUS_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setEditStatus(s)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        editStatus === s
+                          ? STATUS_BADGE[s] + ' ring-2 ring-offset-1 ring-gray-300'
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {saveError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {saveError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-between">
+              <button
+                onClick={handleDelete}
+                disabled={deleting || saving}
+                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={closeModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || deleting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
