@@ -73,6 +73,25 @@ export const POST: APIRoute = async ({ request }) => {
     // ── Step 1: Calculate effective start dates per content type ──
     // Start date = today + delay (from settings)
     const todayStr = now.substring(0, 10); // YYYY-MM-DD
+
+    // ── Create onboarding tasks in the task dashboard ──
+    const onboardingTasks = [
+      { title: 'Welcome email / call', dayOffset: 0 },
+      { title: 'Create the scenarios', dayOffset: 1 },
+      { title: 'Get access', dayOffset: 1 },
+    ];
+    const onboardingBatch = db.batch();
+    for (const task of onboardingTasks) {
+      const ref = db.collection('scheduled_tasks').doc();
+      onboardingBatch.set(ref, {
+        clientId,
+        title: task.title,
+        status: 'todo',
+        scheduledDate: addDays(todayStr, task.dayOffset),
+      });
+    }
+    await onboardingBatch.commit();
+
     const postStartDate = addDays(todayStr, delays.postDelayDays);
     const videoStartDate = addDays(todayStr, delays.videoDelayDays);   // also used for scenarios
     const carouselStartDate = addDays(todayStr, delays.carouselDelayDays);
