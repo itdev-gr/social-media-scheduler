@@ -26,9 +26,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (!body.clientName?.trim()) {
       return new Response(JSON.stringify({ error: 'Client name is required' }), { status: 400 });
     }
-    if (!body.startMonth?.match(/^\d{4}-\d{2}$/)) {
-      return new Response(JSON.stringify({ error: 'Start month must be YYYY-MM format' }), { status: 400 });
+    if (!body.startDate?.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return new Response(JSON.stringify({ error: 'Start date must be YYYY-MM-DD format' }), { status: 400 });
     }
+    const startMonth = body.startDate.substring(0, 7); // derive YYYY-MM from the date
     if (!body.monthsCount || body.monthsCount < 1 || body.monthsCount > 24) {
       return new Response(JSON.stringify({ error: 'Months count must be between 1 and 24' }), { status: 400 });
     }
@@ -56,7 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
     const planRef = db.collection('plans').doc();
     const plan: Plan = {
       clientId,
-      startMonth: body.startMonth,
+      startMonth,
       monthsCount: body.monthsCount,
       postsPerMonth: body.postsPerMonth || 0,
       scenariosPerMonth: body.scenariosPerMonth || 0,
@@ -68,11 +69,11 @@ export const POST: APIRoute = async ({ request }) => {
     const planId = planRef.id;
 
     // Generate month sequence
-    const months = generateMonthSequence(body.startMonth, body.monthsCount);
+    const months = generateMonthSequence(startMonth, body.monthsCount);
 
     // ── Step 1: Calculate effective start dates per content type ──
-    // Start date = today + delay (from settings)
-    const todayStr = now.substring(0, 10); // YYYY-MM-DD
+    // Start date = client start date + delay (from settings)
+    const clientStartDate = body.startDate; // YYYY-MM-DD
 
     // ── Create onboarding tasks in the task dashboard ──
     const onboardingTasks = [
@@ -87,15 +88,15 @@ export const POST: APIRoute = async ({ request }) => {
         clientId,
         title: task.title,
         status: 'todo',
-        scheduledDate: addDays(todayStr, task.dayOffset),
+        scheduledDate: addDays(clientStartDate, task.dayOffset),
       });
     }
     await onboardingBatch.commit();
 
-    const postStartDate = addDays(todayStr, delays.postDelayDays);
-    const videoStartDate = addDays(todayStr, delays.videoDelayDays);   // also used for scenarios
-    const carouselStartDate = addDays(todayStr, delays.carouselDelayDays);
-    const storyStartDate = addDays(todayStr, delays.storyDelayDays);
+    const postStartDate = addDays(clientStartDate, delays.postDelayDays);
+    const videoStartDate = addDays(clientStartDate, delays.videoDelayDays);   // also used for scenarios
+    const carouselStartDate = addDays(clientStartDate, delays.carouselDelayDays);
+    const storyStartDate = addDays(clientStartDate, delays.storyDelayDays);
 
     // Helper: given an effective start date (YYYY-MM-DD) and a month (year, month),
     // returns the day-of-month from which scheduling should begin.

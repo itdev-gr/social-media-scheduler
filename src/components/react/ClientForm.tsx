@@ -27,9 +27,9 @@ export default function ClientForm() {
   const [selectedPackage, setSelectedPackage] = useState('');
   const [clientName, setClientName] = useState('');
   const [clickupId, setClickupId] = useState('');
-  const [startMonth, setStartMonth] = useState(() => {
+  const [startDate, setStartDate] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   });
   const [monthsCount, setMonthsCount] = useState(3);
   const [postsPerMonth, setPostsPerMonth] = useState(0);
@@ -66,7 +66,7 @@ export default function ClientForm() {
         body: JSON.stringify({
           clientName,
           clickupId,
-          startMonth,
+          startDate,
           monthsCount,
           postsPerMonth,
           scenariosPerMonth,
@@ -137,11 +137,11 @@ export default function ClientForm() {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Start Month</label>
+          <label className={labelClass}>Start Date</label>
           <input
-            type="month"
-            value={startMonth}
-            onChange={(e) => setStartMonth(e.target.value)}
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
             className={inputClass}
             required
           />

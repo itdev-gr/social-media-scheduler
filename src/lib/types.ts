@@ -52,7 +52,7 @@ export interface ContentItem {
 // API request/response
 export interface GenerateRequest {
   clientName: string;
-  startMonth: string; // YYYY-MM
+  startDate: string; // YYYY-MM-DD
   monthsCount: number;
   postsPerMonth: number;
   scenariosPerMonth: number; // creates both SCENARIO and VIDEO items
