@@ -50,6 +50,7 @@ function getMonday(d: Date): Date {
 }
 
 export default function TaskCalendar({ items: initialItems, clients }: Props) {
+  const canCreate = !!(clients && clients.length > 0);
   const [items, setItems] = useState<TaskItem[]>(initialItems);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => {
@@ -67,6 +68,15 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  // Create modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createClientId, setCreateClientId] = useState('');
+  const [createTitle, setCreateTitle] = useState('');
+  const [createDate, setCreateDate] = useState('');
+  const [createStatus, setCreateStatus] = useState<TaskStatus>('todo');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   const { year, month } = currentDate;
 
@@ -150,6 +160,56 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
       setSaveError('Network error');
     } finally {
       setDeleting(false);
+    }
+  }
+
+  function openCreateModal(prefilledDate?: string) {
+    setCreateClientId(clients && clients.length > 0 ? clients[0].id : '');
+    setCreateTitle('');
+    setCreateStatus('todo');
+    setCreateDate(prefilledDate || formatDateStr(new Date()));
+    setCreateError('');
+    setShowCreateModal(true);
+  }
+
+  async function handleCreate() {
+    if (!createClientId || !createTitle.trim()) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      const res = await fetch('/api/scheduled-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: createClientId,
+          title: createTitle.trim(),
+          scheduledDate: createDate,
+          status: createStatus,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setCreateError(data.error || 'Failed to create task');
+        return;
+      }
+      const data = await res.json();
+      const clientName = clients?.find((c) => c.id === createClientId)?.name || 'Unknown';
+      setItems((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          title: data.title,
+          status: data.status,
+          scheduledDate: data.scheduledDate,
+          clientId: data.clientId,
+          clientName,
+        },
+      ]);
+      setShowCreateModal(false);
+    } catch {
+      setCreateError('Network error');
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -300,6 +360,14 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
           </div>
 
           <div className="flex items-center gap-2">
+            {canCreate && (
+              <button
+                onClick={() => openCreateModal()}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                + Create Task
+              </button>
+            )}
             <button
               onClick={goToToday}
               className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -346,7 +414,7 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
                 return (
                   <div
                     key={i}
-                    className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 ${cell.day === null ? 'bg-gray-50' : ''}`}
+                    className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 ${cell.day === null ? 'bg-gray-50' : 'group'}`}
                   >
                     {cell.day !== null && (
                       <>
@@ -354,6 +422,14 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
                           <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
                             {cell.day}
                           </div>
+                          {canCreate && (
+                            <button
+                              onClick={() => openCreateModal(cell.dateStr)}
+                              className="w-5 h-5 flex items-center justify-center rounded text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all text-xs"
+                            >
+                              +
+                            </button>
+                          )}
                         </div>
                         <div className="space-y-1">
                           {dayItems.map((item) => renderTaskChip(item))}
@@ -387,7 +463,15 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
               {weekDays.map((wd) => {
                 const dayItems = itemsByDate.get(wd.dateStr) || [];
                 return (
-                  <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2">
+                  <div key={wd.dateStr} className="min-h-[300px] border-r border-gray-100 p-2 group">
+                    {canCreate && (
+                      <button
+                        onClick={() => openCreateModal(wd.dateStr)}
+                        className="w-full mb-1.5 py-1 text-xs text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        + Add
+                      </button>
+                    )}
                     <div className="space-y-1.5">
                       {dayItems.map((item) => (
                         <button
@@ -425,6 +509,110 @@ export default function TaskCalendar({ items: initialItems, clients }: Props) {
           ))}
         </div>
       </div>
+
+      {/* Create Task Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCreateModal(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Create Task</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {clients && clients.length > 0 && (
+                <div>
+                  <label className={labelClass}>Client</label>
+                  <select
+                    value={createClientId}
+                    onChange={(e) => setCreateClientId(e.target.value)}
+                    className={inputClass}
+                  >
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className={labelClass}>Title</label>
+                <input
+                  type="text"
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. Welcome email / call"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Scheduled Date</label>
+                <input
+                  type="date"
+                  value={createDate}
+                  onChange={(e) => setCreateDate(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Status</label>
+                <div className="flex gap-2">
+                  {STATUS_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setCreateStatus(s)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        createStatus === s
+                          ? STATUS_BADGE[s] + ' ring-2 ring-offset-1 ring-gray-300'
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {createError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {createError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating || !createTitle.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {creating ? 'Creating...' : 'Create Task'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit / Delete Modal */}
       {selected && (
