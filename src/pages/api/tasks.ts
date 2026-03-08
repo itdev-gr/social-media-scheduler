@@ -93,6 +93,22 @@ export const POST: APIRoute = async ({ request }) => {
     if (body.customName && typeof body.customName === 'string' && body.customName.trim()) {
       contentItem.customName = body.customName.trim();
     }
+    if (body.caption && typeof body.caption === 'string') {
+      contentItem.caption = body.caption;
+    }
+    if (Array.isArray(body.mediaIds)) {
+      contentItem.mediaIds = body.mediaIds;
+    }
+    if (Array.isArray(body.mediaUrls)) {
+      contentItem.mediaUrls = body.mediaUrls;
+    }
+    if (Array.isArray(body.platforms)) {
+      const validPlatforms = body.platforms.filter((p: string) => p === 'instagram' || p === 'facebook');
+      if (validPlatforms.length > 0) contentItem.platforms = validPlatforms;
+    }
+    if (body.scheduledPostTime && typeof body.scheduledPostTime === 'string' && /^\d{2}:\d{2}$/.test(body.scheduledPostTime)) {
+      contentItem.scheduledPostTime = body.scheduledPostTime;
+    }
     await contentRef.set(contentItem);
 
     // Auto-create an "edit" task in the task scheduling dashboard one day before

@@ -48,6 +48,37 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       updates.customName = body.customName.trim();
     }
 
+    // Caption
+    if (body.caption !== undefined) {
+      updates.caption = typeof body.caption === 'string' ? body.caption : '';
+    }
+
+    // Media IDs
+    if (body.mediaIds !== undefined) {
+      updates.mediaIds = Array.isArray(body.mediaIds) ? body.mediaIds : [];
+    }
+
+    // Media URLs
+    if (body.mediaUrls !== undefined) {
+      updates.mediaUrls = Array.isArray(body.mediaUrls) ? body.mediaUrls : [];
+    }
+
+    // Platforms
+    if (body.platforms !== undefined) {
+      if (Array.isArray(body.platforms)) {
+        updates.platforms = body.platforms.filter((p: string) => p === 'instagram' || p === 'facebook');
+      } else {
+        updates.platforms = [];
+      }
+    }
+
+    // Scheduled post time
+    if (body.scheduledPostTime !== undefined) {
+      if (typeof body.scheduledPostTime === 'string' && /^\d{2}:\d{2}$/.test(body.scheduledPostTime)) {
+        updates.scheduledPostTime = body.scheduledPostTime;
+      }
+    }
+
     // Scheduled date
     if (body.scheduledDate !== undefined) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(body.scheduledDate)) {

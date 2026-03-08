@@ -4,6 +4,17 @@ export type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY' | 'SCENARIO';
 // Content item status
 export type ContentStatus = 'todo' | 'doing' | 'done';
 
+// Publish status for Post Bridge integration
+export type PublishStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partially_failed' | 'failed';
+
+// Social account from Post Bridge
+export interface SocialAccount {
+  id: number;
+  platform: 'instagram' | 'facebook';
+  name: string;
+  username?: string;
+}
+
 // Firestore document interfaces
 export interface Client {
   id?: string;
@@ -47,6 +58,15 @@ export interface ContentItem {
   scheduledDate: string; // YYYY-MM-DD
   status: ContentStatus;
   customName?: string; // optional user-defined name displayed on calendar
+  caption?: string;
+  mediaIds?: string[];         // Post Bridge media IDs
+  mediaUrls?: string[];        // Preview URLs for uploaded images
+  platforms?: ('instagram' | 'facebook')[];
+  postBridgePostId?: string;   // Post Bridge post ID after submission
+  publishStatus?: PublishStatus;
+  publishError?: string;
+  retryCount?: number;
+  scheduledPostTime?: string;  // HH:mm for time-of-day scheduling
 }
 
 // API request/response
