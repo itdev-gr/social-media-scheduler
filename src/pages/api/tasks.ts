@@ -95,6 +95,19 @@ export const POST: APIRoute = async ({ request }) => {
     }
     await contentRef.set(contentItem);
 
+    // Auto-create an "edit" task in the task scheduling dashboard one day before
+    const clientData = clientDoc.data() as { name: string };
+    const prevDate = new Date(body.scheduledDate + 'T00:00:00');
+    prevDate.setDate(prevDate.getDate() - 1);
+    const editTaskDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+    const editTaskRef = db.collection('scheduled_tasks').doc();
+    await editTaskRef.set({
+      clientId: body.clientId,
+      title: `edit - ${clientData.name}`,
+      status: 'todo',
+      scheduledDate: editTaskDate,
+    });
+
     return new Response(JSON.stringify({ id: contentRef.id, ...contentItem }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

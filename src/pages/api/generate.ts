@@ -179,6 +179,21 @@ export const POST: APIRoute = async ({ request }) => {
         };
         allContentWrites.push({ ref: contentRef, data: contentItem as Record<string, unknown> });
         contentItemsCreated++;
+
+        // Auto-create an "edit" task one day before this content item
+        const prevDate = new Date(item.date + 'T00:00:00');
+        prevDate.setDate(prevDate.getDate() - 1);
+        const editTaskDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+        const editTaskRef = db.collection('scheduled_tasks').doc();
+        allContentWrites.push({
+          ref: editTaskRef,
+          data: {
+            clientId,
+            title: `edit - ${client.name}`,
+            status: 'todo',
+            scheduledDate: editTaskDate,
+          },
+        });
       }
     }
 
