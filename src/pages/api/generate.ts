@@ -179,25 +179,32 @@ export const POST: APIRoute = async ({ request }) => {
         };
         allContentWrites.push({ ref: contentRef, data: contentItem as Record<string, unknown> });
         contentItemsCreated++;
-
-        // Auto-create an "edit" task one day before this content item
-        const prevDate = new Date(item.date + 'T00:00:00');
-        prevDate.setDate(prevDate.getDate() - 1);
-        const editTaskDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
-        const editTaskRef = db.collection('scheduled_tasks').doc();
-        allContentWrites.push({
-          ref: editTaskRef,
-          data: {
-            clientId,
-            title: `edit - ${client.name}`,
-            status: 'todo',
-            scheduledDate: editTaskDate,
-          },
-        });
       }
     }
 
     await batchWrite(db, allContentWrites);
+
+    // Auto-create "edit" tasks one day before each content item
+    const editTaskWrites: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
+    for (const write of allContentWrites) {
+      const data = write.data;
+      if (!data.type || !data.scheduledDate) continue; // skip non-content writes
+      const postName = `${data.type} ${data.number}`;
+      const prevDate = new Date((data.scheduledDate as string) + 'T00:00:00');
+      prevDate.setDate(prevDate.getDate() - 1);
+      const editTaskDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+      const editTaskRef = db.collection('scheduled_tasks').doc();
+      editTaskWrites.push({
+        ref: editTaskRef,
+        data: {
+          clientId,
+          title: `Edit - ${postName} - ${client.name}`,
+          status: 'todo',
+          scheduledDate: editTaskDate,
+        },
+      });
+    }
+    await batchWrite(db, editTaskWrites);
 
     const response: GenerateResponse = {
       clientId,
