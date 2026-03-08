@@ -715,6 +715,53 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
     );
   }
 
+  function renderAccountsDropdown() {
+    const igAccounts = socialAccounts.filter((a) => a.platform === 'instagram');
+    const fbAccounts = socialAccounts.filter((a) => a.platform === 'facebook');
+
+    if (socialAccounts.length === 0) {
+      return <p className="text-[10px] text-gray-400 mt-1">No social accounts connected</p>;
+    }
+
+    return (
+      <details className="mt-1.5">
+        <summary className="text-xs text-indigo-600 cursor-pointer hover:text-indigo-700 select-none">
+          {socialAccounts.length} connected account{socialAccounts.length !== 1 ? 's' : ''}
+        </summary>
+        <div className="mt-1.5 border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+          {igAccounts.length > 0 && (
+            <div>
+              <div className="px-3 py-1.5 bg-gradient-to-r from-purple-50 to-pink-50">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-600">Instagram</span>
+              </div>
+              {igAccounts.map((acc) => (
+                <div key={acc.id} className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50">
+                  <span className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex-shrink-0" />
+                  <span className="text-xs text-gray-800 font-medium">{acc.name}</span>
+                  {acc.username && <span className="text-[10px] text-gray-400">@{acc.username}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {fbAccounts.length > 0 && (
+            <div>
+              <div className="px-3 py-1.5 bg-blue-50">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">Facebook</span>
+              </div>
+              {fbAccounts.map((acc) => (
+                <div key={acc.id} className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                  <span className="text-xs text-gray-800 font-medium">{acc.name}</span>
+                  {acc.username && <span className="text-[10px] text-gray-400">@{acc.username}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
+    );
+  }
+
   function renderMediaUpload(isEdit: boolean) {
     const previews = isEdit ? editMediaPreviews : createMediaPreviews;
     const progress = isEdit ? editUploadProgress : uploadProgress;
@@ -1027,26 +1074,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
               <div>
                 <label className={labelClass}>Client</label>
                 <p className="text-sm font-semibold text-gray-900">{selected.clientName}</p>
-                {socialAccounts.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {socialAccounts.map((acc) => (
-                      <span
-                        key={acc.id}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          acc.platform === 'instagram'
-                            ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${acc.platform === 'instagram' ? 'bg-purple-500' : 'bg-blue-500'}`} />
-                        {acc.name}{acc.username ? ` @${acc.username}` : ''}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {socialAccounts.length === 0 && (
-                  <p className="text-[10px] text-gray-400 mt-1">No social accounts connected</p>
-                )}
+                {renderAccountsDropdown()}
               </div>
 
               <div>
@@ -1235,6 +1263,14 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+                  {renderAccountsDropdown()}
+                </div>
+              )}
+              {clientId && (
+                <div>
+                  <label className={labelClass}>Client</label>
+                  <p className="text-sm font-semibold text-gray-900">{clientName}</p>
+                  {renderAccountsDropdown()}
                 </div>
               )}
 
