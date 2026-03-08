@@ -1,5 +1,5 @@
 import type { ContentType, ScheduledItem } from './types';
-import { daysInMonth, makeDate } from './date-utils';
+import { daysInMonth, makeDate, addDays } from './date-utils';
 
 /**
  * Distributes `count` items evenly across days [fromDay..totalDays], avoiding `occupiedDays`.
@@ -92,6 +92,53 @@ export function scheduleMonth(
   const storyDays = scheduleContentDays(stories, totalDays, occupied, startDays.stories);
   for (const day of storyDays) {
     items.push({ type: 'STORY', day, date: makeDate(year, month, day) });
+  }
+
+  items.sort((a, b) => a.day - b.day);
+
+  return items;
+}
+
+/**
+ * Schedules content for a 30-day period starting from a given date.
+ * Each "month" is a fixed 30-day window, not a calendar month.
+ * `startDays` controls per-type offsets within the period (1-based day within the 30-day window).
+ */
+export function schedulePeriod(
+  periodStart: string, // YYYY-MM-DD
+  periodDays: number,  // typically 30
+  posts: number,
+  scenarios: number,
+  carousels: number,
+  stories: number = 0,
+  startDays: MonthStartDays = { posts: 1, scenarios: 1, carousels: 1, stories: 1 }
+): ScheduledItem[] {
+  const occupied = new Set<number>();
+  const items: ScheduledItem[] = [];
+
+  // Schedule posts
+  const postDays = scheduleContentDays(posts, periodDays, occupied, startDays.posts);
+  for (const day of postDays) {
+    items.push({ type: 'POST', day, date: addDays(periodStart, day - 1) });
+  }
+
+  // Schedule scenarios + videos on the same days
+  const scenarioDays = scheduleContentDays(scenarios, periodDays, occupied, startDays.scenarios);
+  for (const day of scenarioDays) {
+    items.push({ type: 'SCENARIO', day, date: addDays(periodStart, day - 1) });
+    items.push({ type: 'VIDEO', day, date: addDays(periodStart, day - 1) });
+  }
+
+  // Schedule carousels
+  const carouselDays = scheduleContentDays(carousels, periodDays, occupied, startDays.carousels);
+  for (const day of carouselDays) {
+    items.push({ type: 'CAROUSEL', day, date: addDays(periodStart, day - 1) });
+  }
+
+  // Schedule stories
+  const storyDays = scheduleContentDays(stories, periodDays, occupied, startDays.stories);
+  for (const day of storyDays) {
+    items.push({ type: 'STORY', day, date: addDays(periodStart, day - 1) });
   }
 
   items.sort((a, b) => a.day - b.day);

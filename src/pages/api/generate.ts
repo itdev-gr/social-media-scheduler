@@ -2,8 +2,8 @@ import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
 import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType, PackageDelays, PackageName } from '../../lib/types';
 import { PACKAGE_NAMES } from '../../lib/types';
-import { generateMonthSequence, addDays, daysInMonth } from '../../lib/date-utils';
-import { scheduleMonth, type MonthStartDays } from '../../lib/scheduler';
+import { addDays } from '../../lib/date-utils';
+import { schedulePeriod, type MonthStartDays } from '../../lib/scheduler';
 
 async function batchWrite(
   db: FirebaseFirestore.Firestore,
@@ -30,7 +30,6 @@ export const POST: APIRoute = async ({ request }) => {
     if (!body.startDate?.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return new Response(JSON.stringify({ error: 'Start date must be YYYY-MM-DD format' }), { status: 400 });
     }
-    const startMonth = body.startDate.substring(0, 7); // derive YYYY-MM from the date
     if (!body.monthsCount || body.monthsCount < 1 || body.monthsCount > 24) {
       return new Response(JSON.stringify({ error: 'Months count must be between 1 and 24' }), { status: 400 });
     }
@@ -67,7 +66,7 @@ export const POST: APIRoute = async ({ request }) => {
     const planRef = db.collection('plans').doc();
     const plan: Plan = {
       clientId,
-      startMonth,
+      startMonth: body.startDate.substring(0, 7),
       monthsCount: body.monthsCount,
       postsPerMonth: body.postsPerMonth || 0,
       scenariosPerMonth: body.scenariosPerMonth || 0,
@@ -78,11 +77,7 @@ export const POST: APIRoute = async ({ request }) => {
     await planRef.set(plan);
     const planId = planRef.id;
 
-    // Generate month sequence
-    const months = generateMonthSequence(startMonth, body.monthsCount);
-
-    // ── Step 1: Calculate effective start dates per content type ──
-    // Start date = client start date + delay (from settings)
+    const PERIOD_DAYS = 30;
     const clientStartDate = body.startDate; // YYYY-MM-DD
 
     // ── Create onboarding tasks in the task dashboard ──
@@ -103,57 +98,58 @@ export const POST: APIRoute = async ({ request }) => {
     }
     await onboardingBatch.commit();
 
+    // Calculate effective start dates per content type (delays from settings)
     const postStartDate = addDays(clientStartDate, delays.postDelayDays);
-    const videoStartDate = addDays(clientStartDate, delays.videoDelayDays);   // also used for scenarios
+    const videoStartDate = addDays(clientStartDate, delays.videoDelayDays);
     const carouselStartDate = addDays(clientStartDate, delays.carouselDelayDays);
     const storyStartDate = addDays(clientStartDate, delays.storyDelayDays);
 
-    // Helper: given an effective start date (YYYY-MM-DD) and a month (year, month),
-    // returns the day-of-month from which scheduling should begin.
-    // If the start date is before this month → 1 (full month available).
-    // If the start date is within this month → that day.
-    // If the start date is after this month → totalDays+1 (skip entirely).
-    function getFromDay(startDate: string, year: number, month: number, totalDays: number): number {
-      const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
-      const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`;
-      if (startDate <= monthStart) return 1;
-      if (startDate > monthEnd) return totalDays + 1;
-      return parseInt(startDate.substring(8, 10), 10);
+    // Helper: given a type's effective start date and a period's start/end dates,
+    // returns the day (1-based) within the period from which scheduling should begin.
+    function getFromDay(typeStartDate: string, periodStart: string, periodEnd: string): number {
+      if (typeStartDate <= periodStart) return 1;
+      if (typeStartDate > periodEnd) return PERIOD_DAYS + 1; // skip entirely
+      // Calculate day offset within the period
+      const startMs = new Date(periodStart + 'T00:00:00').getTime();
+      const typeMs = new Date(typeStartDate + 'T00:00:00').getTime();
+      return Math.floor((typeMs - startMs) / (24 * 60 * 60 * 1000)) + 1;
     }
 
-    // ── Step 2: Schedule content using the calculated start dates ──
+    // ── Schedule content using 30-day periods ──
     const allContentWrites: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
     let contentItemsCreated = 0;
-
-    // Global counters per content type for numbering
     const typeCounters = new Map<ContentType, number>();
 
-    for (const m of months) {
-      // Create month doc
+    for (let i = 0; i < body.monthsCount; i++) {
+      const periodStart = addDays(clientStartDate, i * PERIOD_DAYS);
+      const periodEnd = addDays(clientStartDate, (i + 1) * PERIOD_DAYS - 1);
+      const periodLabel = periodStart.substring(0, 7); // YYYY-MM of period start
+
+      // Create month doc for this period
+      const periodDate = new Date(periodStart + 'T00:00:00');
       const monthRef = db.collection('months').doc();
       const monthDoc: Month = {
         clientId,
         planId,
-        label: m.label,
-        year: m.year,
-        month: m.month,
+        label: periodLabel,
+        year: periodDate.getFullYear(),
+        month: periodDate.getMonth() + 1,
       };
       await monthRef.set(monthDoc);
       const monthId = monthRef.id;
 
-      // Calculate per-type start days for this month based on pre-calculated dates
-      const totalDays = daysInMonth(m.year, m.month);
+      // Calculate per-type start days within this 30-day period
       const startDays: MonthStartDays = {
-        posts: getFromDay(postStartDate, m.year, m.month, totalDays),
-        scenarios: getFromDay(videoStartDate, m.year, m.month, totalDays),
-        carousels: getFromDay(carouselStartDate, m.year, m.month, totalDays),
-        stories: getFromDay(storyStartDate, m.year, m.month, totalDays),
+        posts: getFromDay(postStartDate, periodStart, periodEnd),
+        scenarios: getFromDay(videoStartDate, periodStart, periodEnd),
+        carousels: getFromDay(carouselStartDate, periodStart, periodEnd),
+        stories: getFromDay(storyStartDate, periodStart, periodEnd),
       };
 
-      // Schedule content for this month using the calculated start days
-      const scheduledItems = scheduleMonth(
-        m.year,
-        m.month,
+      // Schedule content for this 30-day period
+      const scheduledItems = schedulePeriod(
+        periodStart,
+        PERIOD_DAYS,
         body.postsPerMonth || 0,
         body.scenariosPerMonth || 0,
         body.carouselsPerMonth || 0,
@@ -170,7 +166,7 @@ export const POST: APIRoute = async ({ request }) => {
           clientId,
           planId,
           monthId,
-          monthLabel: m.label,
+          monthLabel: periodLabel,
           type: item.type,
           number: currentNum,
           scheduledDay: item.day,
@@ -188,11 +184,9 @@ export const POST: APIRoute = async ({ request }) => {
     const editTaskWrites: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
     for (const write of allContentWrites) {
       const data = write.data;
-      if (!data.type || !data.scheduledDate) continue; // skip non-content writes
+      if (!data.type || !data.scheduledDate) continue;
       const postName = `${data.type} ${data.number}`;
-      const prevDate = new Date((data.scheduledDate as string) + 'T00:00:00');
-      prevDate.setDate(prevDate.getDate() - 1);
-      const editTaskDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+      const editTaskDate = addDays(data.scheduledDate as string, -1);
       const editTaskRef = db.collection('scheduled_tasks').doc();
       editTaskWrites.push({
         ref: editTaskRef,
@@ -209,7 +203,7 @@ export const POST: APIRoute = async ({ request }) => {
     const response: GenerateResponse = {
       clientId,
       planId,
-      monthsCreated: months.length,
+      monthsCreated: body.monthsCount,
       contentItemsCreated,
     };
 
