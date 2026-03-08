@@ -1027,6 +1027,26 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
               <div>
                 <label className={labelClass}>Client</label>
                 <p className="text-sm font-semibold text-gray-900">{selected.clientName}</p>
+                {socialAccounts.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {socialAccounts.map((acc) => (
+                      <span
+                        key={acc.id}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          acc.platform === 'instagram'
+                            ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${acc.platform === 'instagram' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                        {acc.name}{acc.username ? ` @${acc.username}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {socialAccounts.length === 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">No social accounts connected</p>
+                )}
               </div>
 
               <div>
