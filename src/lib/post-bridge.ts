@@ -114,8 +114,21 @@ export interface PostBridgePostResult {
 }
 
 export async function getSocialAccounts(): Promise<PostBridgeSocialAccount[]> {
-  const data = await request<{ data: PostBridgeSocialAccount[] }>('GET', '/v1/social-accounts');
-  return data.data || [];
+  const allAccounts: PostBridgeSocialAccount[] = [];
+  let offset = 0;
+  const limit = 100;
+
+  while (true) {
+    const data = await request<{ data: PostBridgeSocialAccount[]; metadata: { total: number; next: string | null } }>(
+      'GET',
+      `/v1/social-accounts?limit=${limit}&offset=${offset}`
+    );
+    allAccounts.push(...(data.data || []));
+    if (!data.metadata?.next || (data.data || []).length < limit) break;
+    offset += limit;
+  }
+
+  return allAccounts;
 }
 
 export async function createUploadUrl(
