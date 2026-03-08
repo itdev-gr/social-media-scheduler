@@ -23,6 +23,7 @@ export interface Client {
   notes?: string;
   active?: boolean; // defaults to true
   clickupId?: string;
+  socialAccountIds?: number[]; // Post Bridge social account IDs assigned to this client
 }
 
 export interface Plan {

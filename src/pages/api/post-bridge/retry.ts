@@ -47,10 +47,22 @@ export const POST: APIRoute = async ({ request }) => {
       publishError: '',
     });
 
+    // Use client's assigned accounts if available
+    const clientDoc = await db.collection('clients').doc(item.clientId).get();
+    const clientData = clientDoc.exists ? clientDoc.data() as { socialAccountIds?: number[] } : {};
+
+    let socialAccountIds: number[];
     const allAccounts = await getSocialAccounts();
-    const socialAccountIds = allAccounts
-      .filter((a) => item.platforms!.includes(a.platform as 'instagram' | 'facebook'))
-      .map((a) => a.id);
+    if (clientData.socialAccountIds && clientData.socialAccountIds.length > 0) {
+      const clientAccountSet = new Set(clientData.socialAccountIds);
+      socialAccountIds = allAccounts
+        .filter((a) => clientAccountSet.has(a.id) && item.platforms!.includes(a.platform as 'instagram' | 'facebook'))
+        .map((a) => a.id);
+    } else {
+      socialAccountIds = allAccounts
+        .filter((a) => item.platforms!.includes(a.platform as 'instagram' | 'facebook'))
+        .map((a) => a.id);
+    }
 
     if (socialAccountIds.length === 0) {
       await itemRef.update({ publishStatus: 'failed', publishError: 'No matching social accounts found' });

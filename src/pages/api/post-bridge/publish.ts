@@ -32,11 +32,25 @@ export const POST: APIRoute = async ({ request }) => {
 
     console.log(`[PostBridge] Publishing contentItemId=${contentItemId}, platforms=${JSON.stringify(item.platforms)}, immediate=${!!immediate}`);
 
-    // Look up social account IDs for selected platforms
-    const allAccounts = await getSocialAccounts();
-    const socialAccountIds = allAccounts
-      .filter((a) => item.platforms!.includes(a.platform as 'instagram' | 'facebook'))
-      .map((a) => a.id);
+    // Look up social account IDs — use client's assigned accounts if available, otherwise match by platform
+    const clientDoc = await db.collection('clients').doc(item.clientId).get();
+    const clientData = clientDoc.exists ? clientDoc.data() as { socialAccountIds?: number[] } : {};
+
+    let socialAccountIds: number[];
+    if (clientData.socialAccountIds && clientData.socialAccountIds.length > 0) {
+      // Filter client's assigned accounts to only the selected platforms
+      const allAccounts = await getSocialAccounts();
+      const clientAccountSet = new Set(clientData.socialAccountIds);
+      socialAccountIds = allAccounts
+        .filter((a) => clientAccountSet.has(a.id) && item.platforms!.includes(a.platform as 'instagram' | 'facebook'))
+        .map((a) => a.id);
+    } else {
+      // Fallback: use all accounts matching selected platforms
+      const allAccounts = await getSocialAccounts();
+      socialAccountIds = allAccounts
+        .filter((a) => item.platforms!.includes(a.platform as 'instagram' | 'facebook'))
+        .map((a) => a.id);
+    }
 
     if (socialAccountIds.length === 0) {
       await itemRef.update({ publishStatus: 'failed', publishError: 'No matching social accounts found for selected platforms' });
