@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 
 interface GenerateResponse {
   clientId: string;
@@ -23,7 +23,15 @@ const packages: Package[] = [
   { name: 'Custom', posts: 0, scenarios: 0, stories: 0, carousels: 0 },
 ];
 
+interface SocialAccount {
+  id: number;
+  platform: 'instagram' | 'facebook';
+  name: string;
+  username?: string;
+}
+
 export default function ClientForm() {
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [selectedPackage, setSelectedPackage] = useState('');
   const [clientName, setClientName] = useState('');
   const [clickupId, setClickupId] = useState('');
@@ -37,6 +45,15 @@ export default function ClientForm() {
   const [carouselsPerMonth, setCarouselsPerMonth] = useState(0);
   const [storiesPerMonth, setStoriesPerMonth] = useState(0);
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    fetch('/api/post-bridge/social-accounts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.accounts) setSocialAccounts(data.accounts);
+      })
+      .catch((err) => console.error('Failed to fetch social accounts:', err));
+  }, []);
 
   function handlePackageChange(packageName: string) {
     setSelectedPackage(packageName);
@@ -107,6 +124,43 @@ export default function ClientForm() {
           placeholder="e.g. Acme Corp"
           required
         />
+        {socialAccounts.length > 0 && (
+          <details className="mt-2">
+            <summary className="text-xs text-indigo-600 cursor-pointer hover:text-indigo-700 select-none">
+              {socialAccounts.length} connected account{socialAccounts.length !== 1 ? 's' : ''}
+            </summary>
+            <div className="mt-1.5 border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+              {socialAccounts.filter((a) => a.platform === 'instagram').length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 bg-gradient-to-r from-purple-50 to-pink-50">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-600">Instagram</span>
+                  </div>
+                  {socialAccounts.filter((a) => a.platform === 'instagram').map((acc) => (
+                    <div key={acc.id} className="px-3 py-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex-shrink-0" />
+                      <span className="text-xs text-gray-800 font-medium">{acc.name}</span>
+                      {acc.username && <span className="text-[10px] text-gray-400">@{acc.username}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {socialAccounts.filter((a) => a.platform === 'facebook').length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 bg-blue-50">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">Facebook</span>
+                  </div>
+                  {socialAccounts.filter((a) => a.platform === 'facebook').map((acc) => (
+                    <div key={acc.id} className="px-3 py-2 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                      <span className="text-xs text-gray-800 font-medium">{acc.name}</span>
+                      {acc.username && <span className="text-[10px] text-gray-400">@{acc.username}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+        )}
       </div>
 
       <div>
