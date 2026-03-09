@@ -4,6 +4,9 @@ import DashboardCards from '../components/react/DashboardCards';
 import Calendar from '../components/react/Calendar';
 import { getDb } from '../lib/firebase-admin';
 
+const user = Astro.locals.user;
+const isAdmin = user?.type === 'admin';
+
 let totalClients = 0;
 let totalItems = 0;
 let todoItems = 0;
@@ -12,64 +15,73 @@ let doneItems = 0;
 let calendarItems: any[] = [];
 let clientsList: { id: string; name: string }[] = [];
 
-try {
-  const db = getDb();
+if (isAdmin) {
+  try {
+    const db = getDb();
 
-  // Run all counts and queries in parallel
-  const [clientsSnap, itemsCountSnap, todoSnap, doingSnap, doneSnap, clientsListSnap, recentItemsSnap] = await Promise.all([
-    db.collection('clients').count().get(),
-    db.collection('content_items').count().get(),
-    db.collection('content_items').where('status', '==', 'todo').count().get(),
-    db.collection('content_items').where('status', '==', 'doing').count().get(),
-    db.collection('content_items').where('status', '==', 'done').count().get(),
-    db.collection('clients').get(),
-    db.collection('content_items').orderBy('scheduledDate', 'asc').limit(500).get(),
-  ]);
+    const [clientsSnap, itemsCountSnap, todoSnap, doingSnap, doneSnap, clientsListSnap, recentItemsSnap] = await Promise.all([
+      db.collection('clients').count().get(),
+      db.collection('content_items').count().get(),
+      db.collection('content_items').where('status', '==', 'todo').count().get(),
+      db.collection('content_items').where('status', '==', 'doing').count().get(),
+      db.collection('content_items').where('status', '==', 'done').count().get(),
+      db.collection('clients').get(),
+      db.collection('content_items').orderBy('scheduledDate', 'asc').limit(500).get(),
+    ]);
 
-  totalClients = clientsSnap.data().count;
-  totalItems = itemsCountSnap.data().count;
-  todoItems = todoSnap.data().count;
-  doingItems = doingSnap.data().count;
-  doneItems = doneSnap.data().count;
+    totalClients = clientsSnap.data().count;
+    totalItems = itemsCountSnap.data().count;
+    todoItems = todoSnap.data().count;
+    doingItems = doingSnap.data().count;
+    doneItems = doneSnap.data().count;
 
-  // Build client map and list from the single clients query
-  const clientMap = new Map<string, string>();
-  clientsListSnap.docs.forEach((d) => {
-    clientMap.set(d.id, d.data().name);
-    clientsList.push({ id: d.id, name: d.data().name });
-  });
-
-  for (const doc of recentItemsSnap.docs) {
-    const data = doc.data();
-    calendarItems.push({
-      id: doc.id,
-      type: data.type,
-      number: data.number,
-      customName: data.customName || undefined,
-      status: data.status,
-      scheduledDate: data.scheduledDate,
-      scheduledDay: data.scheduledDay,
-      monthLabel: data.monthLabel,
-      clientId: data.clientId,
-      clientName: clientMap.get(data.clientId) || 'Unknown',
+    const clientMap = new Map<string, string>();
+    clientsListSnap.docs.forEach((d) => {
+      clientMap.set(d.id, d.data().name);
+      clientsList.push({ id: d.id, name: d.data().name });
     });
+
+    for (const doc of recentItemsSnap.docs) {
+      const data = doc.data();
+      calendarItems.push({
+        id: doc.id,
+        type: data.type,
+        number: data.number,
+        customName: data.customName || undefined,
+        status: data.status,
+        scheduledDate: data.scheduledDate,
+        scheduledDay: data.scheduledDay,
+        monthLabel: data.monthLabel,
+        clientId: data.clientId,
+        clientName: clientMap.get(data.clientId) || 'Unknown',
+      });
+    }
+  } catch (e) {
+    // Firebase not configured yet
   }
-} catch (e) {
-  // Firebase not configured yet
 }
 ---
 
 <Layout title="Dashboard">
-  <h2 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
-  <DashboardCards
-    client:load
-    totalClients={totalClients}
-    totalItems={totalItems}
-    todoItems={todoItems}
-    doingItems={doingItems}
-    doneItems={doneItems}
-  />
-  <div class="mt-8">
-    <Calendar client:idle items={calendarItems} clients={clientsList} />
-  </div>
+  {isAdmin ? (
+    <>
+      <h2 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
+      <DashboardCards
+        client:load
+        totalClients={totalClients}
+        totalItems={totalItems}
+        todoItems={todoItems}
+        doingItems={doingItems}
+        doneItems={doneItems}
+      />
+      <div class="mt-8">
+        <Calendar client:idle items={calendarItems} clients={clientsList} />
+      </div>
+    </>
+  ) : (
+    <div>
+      <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome!</h2>
+      <p class="text-gray-500">Your dashboard is being set up.</p>
+    </div>
+  )}
 </Layout>

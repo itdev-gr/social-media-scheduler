@@ -1,5 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
 
 let app: FirebaseApp;
 
@@ -18,4 +19,8 @@ function getApp(): FirebaseApp {
 
 export function getClientDb(): Firestore {
   return getFirestore(getApp());
+}
+
+export function getClientAuth(): Auth {
+  return getAuth(getApp());
 }
