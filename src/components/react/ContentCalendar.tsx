@@ -71,6 +71,13 @@ const PUBLISH_STATUS_BADGE: Record<PublishStatus, { cls: string; label: string }
   failed: { cls: 'bg-red-100 text-red-700', label: 'Failed' },
 };
 
+const CONTENT_HEADER_COLORS: Record<ContentType, string> = {
+  POST: 'bg-indigo-600',
+  VIDEO: 'bg-purple-600',
+  CAROUSEL: 'bg-orange-600',
+  STORY: 'bg-pink-600',
+};
+
 const SECTIONS: ContentType[] = ['POST', 'VIDEO', 'STORY', 'CAROUSEL'];
 const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
@@ -444,6 +451,11 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
+  function getDayName(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+  }
+
   function formatMonthLabel(ml: string): string {
     const [y, m] = ml.split('-');
     const d = new Date(parseInt(y), parseInt(m) - 1);
@@ -521,84 +533,83 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
 
               {/* Accordion Body */}
               {isOpen && (
-                <div className="border-t border-gray-100">
+                <div className="border-t border-gray-100 p-4">
                   {typeItems.length === 0 ? (
-                    <p className="px-5 py-4 text-sm text-gray-400">No items</p>
+                    <p className="px-1 py-2 text-sm text-gray-400">No items</p>
                   ) : (
-                    <div className="divide-y divide-gray-50">
-                      {typeItems.map((item) => {
-                        const ready = isItemReady(item);
-                        const mediaCount = (item.mediaUrls?.length || 0);
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => openModal(item)}
-                            className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors flex items-center gap-4"
-                          >
-                            {/* Name */}
-                            <span className="font-medium text-sm text-gray-900 w-36 truncate flex-shrink-0">
-                              {itemDisplayName(item)}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                      {typeItems.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => openModal(item)}
+                          className="rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col"
+                        >
+                          {/* Day header */}
+                          <div className={`${CONTENT_HEADER_COLORS[item.type]} px-3 py-2 text-center`}>
+                            <span className="text-white text-xs font-bold tracking-wider">
+                              {getDayName(item.scheduledDate)}
                             </span>
+                          </div>
 
-                            {/* Date + Time */}
-                            <span className="text-xs text-gray-500 w-36 flex-shrink-0">
-                              {formatDate(item.scheduledDate)}
-                              {item.scheduledPostTime && (
-                                <span className="ml-1 text-gray-400">{item.scheduledPostTime}</span>
-                              )}
-                            </span>
-
-                            {/* Client */}
-                            <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
-                              {item.clientName}
-                            </span>
-
-                            {/* Status */}
-                            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[item.status]}`}>
-                              {item.status}
-                            </span>
-
-                            {/* Media indicator */}
-                            {mediaCount > 0 ? (
-                              <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                {mediaCount}
-                              </span>
+                          {/* Media preview */}
+                          <div className="relative aspect-square bg-gray-100">
+                            {item.mediaUrls && item.mediaUrls.length > 0 ? (
+                              <img
+                                src={item.mediaUrls[0]}
+                                alt={itemDisplayName(item)}
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
-                              <span className="text-xs text-gray-300 flex-shrink-0">No media</span>
+                              <div className="w-full h-full flex items-center justify-center">
+                                <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
                             )}
+                            {/* Client name overlay */}
+                            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-4">
+                              <span className="text-white text-xs font-semibold drop-shadow-sm">
+                                {item.customName || item.clientName}
+                              </span>
+                            </div>
+                          </div>
 
-                            {/* Readiness indicator */}
-                            <span
-                              className={`w-2 h-2 rounded-full flex-shrink-0 ${ready ? 'bg-green-400' : 'bg-gray-300'}`}
-                              title={ready ? 'Ready to publish' : 'Missing fields'}
-                            />
-
-                            {/* Caption preview */}
-                            <span className="text-xs text-gray-400 truncate flex-1 min-w-0">
-                              {item.caption ? (item.caption.length > 60 ? item.caption.slice(0, 60) + '...' : item.caption) : '—'}
-                            </span>
-
-                            {/* Platforms */}
-                            <div className="flex gap-1 flex-shrink-0">
-                              {item.platforms?.map((p) => (
-                                <span key={p} className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
-                                  {p === 'instagram' ? 'IG' : 'FB'}
-                                </span>
-                              ))}
+                          {/* Info rows */}
+                          <div className="divide-y divide-gray-100">
+                            {/* Approval Status */}
+                            <div className="flex items-center justify-between px-2.5 py-1.5 bg-yellow-50">
+                              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Approval Status</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_COLORS[item.status]}`}>
+                                {item.status.toUpperCase()}
+                              </span>
                             </div>
 
-                            {/* Publish status */}
-                            {item.publishStatus && item.publishStatus !== 'draft' && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${PUBLISH_STATUS_BADGE[item.publishStatus].cls}`}>
-                                {PUBLISH_STATUS_BADGE[item.publishStatus].label}
+                            {/* Content Type */}
+                            <div className="flex items-center justify-between px-2.5 py-1.5 bg-green-50">
+                              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Content Type</span>
+                              <span className={`text-[10px] font-semibold text-white px-1.5 py-0.5 rounded ${CONTENT_COLORS[item.type]}`}>
+                                {item.type}
                               </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                            </div>
+
+                            {/* Platform */}
+                            <div className="flex items-center justify-between px-2.5 py-1.5 bg-red-50">
+                              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Platform</span>
+                              <div className="flex gap-1">
+                                {item.platforms && item.platforms.length > 0 ? (
+                                  item.platforms.map((p) => (
+                                    <span key={p} className="text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                                      {p === 'instagram' ? 'IG' : 'FB'}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">—</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
