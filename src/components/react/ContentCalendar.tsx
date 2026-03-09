@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 type ContentStatus = 'todo' | 'doing' | 'done';
@@ -18,6 +18,7 @@ interface ContentItem {
   clientName: string;
   caption?: string;
   mediaUrls?: string[];
+  mediaIds?: string[];
   platforms?: Platform[];
   publishStatus?: PublishStatus;
   publishError?: string;
@@ -27,6 +28,13 @@ interface ContentItem {
 interface ClientOption {
   id: string;
   name: string;
+}
+
+interface SocialAccount {
+  id: number;
+  platform: Platform;
+  name: string;
+  username?: string;
 }
 
 interface Props {
@@ -64,6 +72,7 @@ const PUBLISH_STATUS_BADGE: Record<PublishStatus, { cls: string; label: string }
 };
 
 const SECTIONS: ContentType[] = ['POST', 'VIDEO', 'STORY', 'CAROUSEL'];
+const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
 
 export default function ContentCalendar({ items: initialItems, clients }: Props) {
@@ -74,6 +83,7 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
 
   // Edit modal state
   const [selected, setSelected] = useState<ContentItem | null>(null);
+  const [editType, setEditType] = useState<ContentType>('POST');
   const [editStatus, setEditStatus] = useState<ContentStatus>('todo');
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
@@ -82,6 +92,58 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
   const [editPlatforms, setEditPlatforms] = useState<Set<Platform>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  // Media upload state
+  const [editMediaFiles, setEditMediaFiles] = useState<File[]>([]);
+  const [editMediaPreviews, setEditMediaPreviews] = useState<string[]>([]);
+  const [editUploadedMediaIds, setEditUploadedMediaIds] = useState<string[]>([]);
+  const [editUploadedMediaUrls, setEditUploadedMediaUrls] = useState<string[]>([]);
+  const [editUploadProgress, setEditUploadProgress] = useState<number | null>(null);
+
+  // Publish state
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+
+  // Status polling ref
+  const statusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch social accounts on mount
+  useEffect(() => {
+    fetch('/api/post-bridge/social-accounts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.accounts) setSocialAccounts(data.accounts);
+      })
+      .catch((err) => console.error('Failed to fetch social accounts:', err));
+  }, []);
+
+  // Status polling for edit modal
+  useEffect(() => {
+    if (selected && (selected.publishStatus === 'publishing' || selected.publishStatus === 'scheduled')) {
+      statusPollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/post-bridge/status/${selected.id}`);
+          const data = await res.json();
+          if (data.publishStatus && data.publishStatus !== selected.publishStatus) {
+            setSelected((prev) => prev ? { ...prev, publishStatus: data.publishStatus, publishError: data.publishError } : null);
+            setItems((all) =>
+              all.map((i) => i.id === selected.id ? { ...i, publishStatus: data.publishStatus, publishError: data.publishError } : i)
+            );
+            if (data.publishStatus === 'published' || data.publishStatus === 'failed' || data.publishStatus === 'partially_failed') {
+              if (statusPollRef.current) clearInterval(statusPollRef.current);
+            }
+          }
+        } catch {
+          // ignore polling errors
+        }
+      }, 5000);
+    }
+    return () => {
+      if (statusPollRef.current) clearInterval(statusPollRef.current);
+    };
+  }, [selected?.id, selected?.publishStatus]);
 
   // Derive unique months from items
   const months = useMemo(() => {
@@ -119,18 +181,86 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
 
   function openModal(item: ContentItem) {
     setSelected(item);
+    setEditType(item.type);
     setEditStatus(item.status);
     setEditDate(item.scheduledDate);
     setEditTime(item.scheduledPostTime || '');
     setEditName(item.customName || '');
     setEditCaption(item.caption || '');
     setEditPlatforms(new Set(item.platforms || []));
+    setEditMediaFiles([]);
+    setEditMediaPreviews(item.mediaUrls || []);
+    setEditUploadedMediaIds(item.mediaIds || []);
+    setEditUploadedMediaUrls(item.mediaUrls || []);
+    setEditUploadProgress(null);
     setSaveError('');
+    setPublishError('');
   }
 
   function closeModal() {
     setSelected(null);
     setSaveError('');
+    setPublishError('');
+  }
+
+  async function uploadFiles(files: File[]): Promise<{ mediaIds: string[]; mediaUrls: string[] }> {
+    const mediaIds: string[] = [];
+    const mediaUrls: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      const uploadRes = await fetch('/api/post-bridge/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mimeType: file.type,
+          sizeBytes: file.size,
+          name: file.name,
+        }),
+      });
+
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json();
+        throw new Error(err.error || 'Failed to get upload URL');
+      }
+
+      const { mediaId, uploadUrl } = await uploadRes.json();
+
+      const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+
+      if (!putRes.ok) {
+        throw new Error(`Failed to upload ${file.name}`);
+      }
+
+      mediaIds.push(mediaId);
+      mediaUrls.push(URL.createObjectURL(file));
+    }
+
+    return { mediaIds, mediaUrls };
+  }
+
+  function handleFileSelect(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    const previews = newFiles.map((f) => URL.createObjectURL(f));
+    setEditMediaFiles((prev) => [...prev, ...newFiles]);
+    setEditMediaPreviews((prev) => [...prev, ...previews]);
+  }
+
+  function removeMedia(index: number) {
+    setEditMediaPreviews((prev) => prev.filter((_, i) => i !== index));
+    if (index < editUploadedMediaIds.length) {
+      setEditUploadedMediaIds((prev) => prev.filter((_, i) => i !== index));
+      setEditUploadedMediaUrls((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      const fileIndex = index - editUploadedMediaIds.length;
+      setEditMediaFiles((prev) => prev.filter((_, i) => i !== fileIndex));
+    }
   }
 
   async function handleSave() {
@@ -139,7 +269,20 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
     setSaveError('');
 
     try {
+      // Upload any new media files first
+      let newMediaIds = [...editUploadedMediaIds];
+      let newMediaUrls = [...editUploadedMediaUrls];
+
+      if (editMediaFiles.length > 0) {
+        setEditUploadProgress(0);
+        const result = await uploadFiles(editMediaFiles);
+        newMediaIds = [...newMediaIds, ...result.mediaIds];
+        newMediaUrls = [...newMediaUrls, ...result.mediaUrls];
+        setEditUploadProgress(null);
+      }
+
       const updates: Record<string, unknown> = {};
+      if (editType !== selected.type) updates.type = editType;
       if (editStatus !== selected.status) updates.status = editStatus;
       if (editDate !== selected.scheduledDate) updates.scheduledDate = editDate;
       if (editTime !== (selected.scheduledPostTime || '')) updates.scheduledPostTime = editTime;
@@ -150,6 +293,11 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
       const origPlatforms = selected.platforms || [];
       if (JSON.stringify(platformsArr.sort()) !== JSON.stringify([...origPlatforms].sort())) {
         updates.platforms = platformsArr;
+      }
+
+      if (JSON.stringify(newMediaIds) !== JSON.stringify(selected.mediaIds || [])) {
+        updates.mediaIds = newMediaIds;
+        updates.mediaUrls = newMediaUrls;
       }
 
       if (Object.keys(updates).length === 0) {
@@ -177,6 +325,7 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
           i.id === selected.id
             ? {
                 ...i,
+                type: editType,
                 status: editStatus,
                 scheduledDate: editDate,
                 scheduledDay: newDay,
@@ -184,6 +333,8 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
                 customName: editName || undefined,
                 caption: editCaption || undefined,
                 platforms: platformsArr.length > 0 ? platformsArr : undefined,
+                mediaIds: newMediaIds.length > 0 ? newMediaIds : undefined,
+                mediaUrls: newMediaUrls.length > 0 ? newMediaUrls : undefined,
                 scheduledPostTime: editTime || undefined,
               }
             : i
@@ -194,6 +345,88 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
       setSaveError('Network error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePublish(immediate: boolean) {
+    if (!selected) return;
+    setPublishing(true);
+    setPublishError('');
+    try {
+      await handleSave();
+
+      const res = await fetch('/api/post-bridge/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId: selected.id, immediate, timezoneOffset: new Date().getTimezoneOffset() }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setPublishError(data.error || 'Failed to publish');
+        return;
+      }
+
+      const data = await res.json();
+      const newStatus = data.publishStatus as PublishStatus;
+
+      setSelected((prev) => prev ? { ...prev, publishStatus: newStatus } : null);
+      setItems((all) =>
+        all.map((i) => i.id === selected.id ? { ...i, publishStatus: newStatus } : i)
+      );
+    } catch {
+      setPublishError('Network error');
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function handleRetry() {
+    if (!selected) return;
+    setPublishing(true);
+    setPublishError('');
+    try {
+      const res = await fetch('/api/post-bridge/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId: selected.id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setPublishError(data.error || 'Retry failed');
+        return;
+      }
+
+      setSelected((prev) => prev ? { ...prev, publishStatus: 'publishing', publishError: undefined } : null);
+      setItems((all) =>
+        all.map((i) => i.id === selected.id ? { ...i, publishStatus: 'publishing', publishError: undefined } : i)
+      );
+    } catch {
+      setPublishError('Network error');
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!selected) return;
+    if (!confirm('Are you sure you want to delete this content item?')) return;
+    setDeleting(true);
+    setSaveError('');
+    try {
+      const res = await fetch(`/api/tasks/${selected.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        setSaveError(data.error || 'Failed to delete');
+        return;
+      }
+      setItems((all) => all.filter((i) => i.id !== selected.id));
+      closeModal();
+    } catch {
+      setSaveError('Network error');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -221,6 +454,16 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
     if (item.customName) return item.customName;
     return `${item.type} ${item.number || ''}`.trim();
   }
+
+  function isItemReady(item: ContentItem): boolean {
+    return !!(item.caption && item.platforms && item.platforms.length > 0 && item.mediaUrls && item.mediaUrls.length > 0);
+  }
+
+  const canPublishEdit = selected && editCaption && editPlatforms.size > 0;
+  const canScheduleEdit = canPublishEdit && editDate && editTime;
+
+  const hasIG = socialAccounts.some((a) => a.platform === 'instagram');
+  const hasFB = socialAccounts.some((a) => a.platform === 'facebook');
 
   return (
     <div>
@@ -283,54 +526,79 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
                     <p className="px-5 py-4 text-sm text-gray-400">No items</p>
                   ) : (
                     <div className="divide-y divide-gray-50">
-                      {typeItems.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => openModal(item)}
-                          className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors flex items-center gap-4"
-                        >
-                          {/* Name */}
-                          <span className="font-medium text-sm text-gray-900 w-36 truncate flex-shrink-0">
-                            {itemDisplayName(item)}
-                          </span>
-
-                          {/* Date */}
-                          <span className="text-xs text-gray-500 w-32 flex-shrink-0">
-                            {formatDate(item.scheduledDate)}
-                          </span>
-
-                          {/* Client */}
-                          <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
-                            {item.clientName}
-                          </span>
-
-                          {/* Status */}
-                          <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[item.status]}`}>
-                            {item.status}
-                          </span>
-
-                          {/* Caption preview */}
-                          <span className="text-xs text-gray-400 truncate flex-1 min-w-0">
-                            {item.caption ? (item.caption.length > 80 ? item.caption.slice(0, 80) + '...' : item.caption) : '—'}
-                          </span>
-
-                          {/* Platforms */}
-                          <div className="flex gap-1 flex-shrink-0">
-                            {item.platforms?.map((p) => (
-                              <span key={p} className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
-                                {p === 'instagram' ? 'IG' : 'FB'}
-                              </span>
-                            ))}
-                          </div>
-
-                          {/* Publish status */}
-                          {item.publishStatus && item.publishStatus !== 'draft' && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${PUBLISH_STATUS_BADGE[item.publishStatus].cls}`}>
-                              {PUBLISH_STATUS_BADGE[item.publishStatus].label}
+                      {typeItems.map((item) => {
+                        const ready = isItemReady(item);
+                        const mediaCount = (item.mediaUrls?.length || 0);
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => openModal(item)}
+                            className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors flex items-center gap-4"
+                          >
+                            {/* Name */}
+                            <span className="font-medium text-sm text-gray-900 w-36 truncate flex-shrink-0">
+                              {itemDisplayName(item)}
                             </span>
-                          )}
-                        </button>
-                      ))}
+
+                            {/* Date + Time */}
+                            <span className="text-xs text-gray-500 w-36 flex-shrink-0">
+                              {formatDate(item.scheduledDate)}
+                              {item.scheduledPostTime && (
+                                <span className="ml-1 text-gray-400">{item.scheduledPostTime}</span>
+                              )}
+                            </span>
+
+                            {/* Client */}
+                            <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
+                              {item.clientName}
+                            </span>
+
+                            {/* Status */}
+                            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[item.status]}`}>
+                              {item.status}
+                            </span>
+
+                            {/* Media indicator */}
+                            {mediaCount > 0 ? (
+                              <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {mediaCount}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-300 flex-shrink-0">No media</span>
+                            )}
+
+                            {/* Readiness indicator */}
+                            <span
+                              className={`w-2 h-2 rounded-full flex-shrink-0 ${ready ? 'bg-green-400' : 'bg-gray-300'}`}
+                              title={ready ? 'Ready to publish' : 'Missing fields'}
+                            />
+
+                            {/* Caption preview */}
+                            <span className="text-xs text-gray-400 truncate flex-1 min-w-0">
+                              {item.caption ? (item.caption.length > 60 ? item.caption.slice(0, 60) + '...' : item.caption) : '—'}
+                            </span>
+
+                            {/* Platforms */}
+                            <div className="flex gap-1 flex-shrink-0">
+                              {item.platforms?.map((p) => (
+                                <span key={p} className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
+                                  {p === 'instagram' ? 'IG' : 'FB'}
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Publish status */}
+                            {item.publishStatus && item.publishStatus !== 'draft' && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${PUBLISH_STATUS_BADGE[item.publishStatus].cls}`}>
+                                {PUBLISH_STATUS_BADGE[item.publishStatus].label}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -342,126 +610,266 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
 
       {/* Edit Modal */}
       {selected && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={closeModal}>
+          <div className="absolute inset-0 bg-black/40" />
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            className="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">Edit Content Item</h3>
-                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">Edit Content Item</h3>
+                {selected.publishStatus && selected.publishStatus !== 'draft' && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${PUBLISH_STATUS_BADGE[selected.publishStatus].cls}`}>
+                    {PUBLISH_STATUS_BADGE[selected.publishStatus].label}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={closeModal}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 overflow-y-auto">
+              {/* Client info */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selected.clientName}</span>
+                <span className="text-xs text-gray-400">#{selected.number}</span>
               </div>
 
-              {/* Type badge (read-only) */}
-              <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${CONTENT_COLORS[selected.type]}`} />
-                <span className="text-sm font-medium text-gray-700">{selected.type}</span>
-                <span className="text-xs text-gray-400">#{selected.number}</span>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full ml-auto">{selected.clientName}</span>
+              {/* Content Type */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Content Type</label>
+                <div className="flex gap-2">
+                  {TYPE_OPTIONS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setEditType(t)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        editType === t
+                          ? `text-white ${CONTENT_COLORS[t]}`
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Custom Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Custom Name</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Task Name</label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   placeholder={`${selected.type} ${selected.number || ''}`}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value as ContentStatus)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Scheduled Date */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                  <input
-                    type="time"
-                    value={editTime}
-                    onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Platforms */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Platforms</label>
-                <div className="flex gap-3">
-                  {(['instagram', 'facebook'] as Platform[]).map((p) => (
-                    <label key={p} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editPlatforms.has(p)}
-                        onChange={() => togglePlatform(p)}
-                        className="rounded border-gray-300"
-                      />
-                      {p === 'instagram' ? 'Instagram' : 'Facebook'}
-                    </label>
-                  ))}
-                </div>
               </div>
 
               {/* Caption */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Caption / Description</label>
                 <textarea
                   value={editCaption}
                   onChange={(e) => setEditCaption(e.target.value)}
-                  rows={5}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y"
-                  placeholder="Write caption..."
+                  rows={4}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  placeholder="Write your post caption here..."
                 />
               </div>
 
-              {/* Error */}
-              {saveError && (
-                <p className="text-sm text-red-600">{saveError}</p>
+              {/* Media Upload */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Media</label>
+                {editMediaPreviews.length > 0 && (
+                  <div className="flex gap-2 mb-2 flex-wrap">
+                    {editMediaPreviews.map((url, i) => (
+                      <div key={i} className="relative w-16 h-16">
+                        <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => removeMedia(i)}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,video/mp4"
+                  multiple
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                  className="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                />
+                {editUploadProgress !== null && (
+                  <div className="mt-1 text-xs text-indigo-600">Uploading media...</div>
+                )}
+              </div>
+
+              {/* Platforms */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Platforms</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => togglePlatform('instagram')}
+                    disabled={!hasIG}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      editPlatforms.has('instagram')
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                        : hasIG
+                          ? 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                          : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    Instagram
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => togglePlatform('facebook')}
+                    disabled={!hasFB}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      editPlatforms.has('facebook')
+                        ? 'bg-blue-600 text-white'
+                        : hasFB
+                          ? 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                          : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    Facebook
+                  </button>
+                </div>
+                {socialAccounts.length === 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">No social accounts connected</p>
+                )}
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Post Time</label>
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
+                <div className="flex gap-2">
+                  {STATUS_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setEditStatus(s)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        editStatus === s
+                          ? STATUS_COLORS[s] + ' ring-2 ring-offset-1 ring-gray-300'
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Publish error display */}
+              {(selected.publishError || publishError) && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {publishError || selected.publishError}
+                </div>
               )}
 
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-2">
+              {saveError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {saveError}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+              <div className="flex gap-2">
+                {/* Delete button */}
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+                {/* Post Now button */}
+                {canPublishEdit && selected.publishStatus !== 'published' && selected.publishStatus !== 'publishing' && (
+                  <button
+                    onClick={() => handlePublish(true)}
+                    disabled={publishing}
+                    className="px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {publishing ? 'Publishing...' : 'Post Now'}
+                  </button>
+                )}
+                {/* Schedule Post button */}
+                {canScheduleEdit && selected.publishStatus !== 'published' && selected.publishStatus !== 'scheduled' && selected.publishStatus !== 'publishing' && (
+                  <button
+                    onClick={() => handlePublish(false)}
+                    disabled={publishing}
+                    className="px-3 py-2 text-xs font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors"
+                  >
+                    Schedule Post
+                  </button>
+                )}
+                {/* Retry button */}
+                {(selected.publishStatus === 'failed' || selected.publishStatus === 'partially_failed') && (
+                  <button
+                    onClick={handleRetry}
+                    disabled={publishing}
+                    className="px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors"
+                  >
+                    {publishing ? 'Retrying...' : 'Retry'}
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
                 <button
                   onClick={closeModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                 >
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
