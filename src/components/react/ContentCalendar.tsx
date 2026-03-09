@@ -83,17 +83,6 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // Derive clients that have content items (only show these in dropdown)
-  const activeClients = useMemo(() => {
-    const seen = new Map<string, string>();
-    items.forEach((i) => {
-      if (!seen.has(i.clientId)) seen.set(i.clientId, i.clientName);
-    });
-    return Array.from(seen.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [items]);
-
   // Derive unique months from items
   const months = useMemo(() => {
     const set = new Set<string>();
@@ -243,7 +232,7 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
         >
           <option value="">All Clients</option>
-          {activeClients.map((c) => (
+          {clients.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
