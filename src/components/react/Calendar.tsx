@@ -512,7 +512,7 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
       const res = await fetch('/api/post-bridge/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentItemId: selected.id, immediate }),
+        body: JSON.stringify({ contentItemId: selected.id, immediate, timezoneOffset: new Date().getTimezoneOffset() }),
       });
 
       if (!res.ok) {

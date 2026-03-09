@@ -6,7 +6,7 @@ import type { ContentItem } from '../../../lib/types';
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json();
-    const { contentItemId, immediate } = body;
+    const { contentItemId, immediate, timezoneOffset } = body;
 
     if (!contentItemId) {
       return new Response(JSON.stringify({ error: 'contentItemId is required' }), { status: 400 });
@@ -64,7 +64,13 @@ export const POST: APIRoute = async ({ request }) => {
     let scheduledAt: string | undefined;
     if (!immediate && item.scheduledDate) {
       const time = item.scheduledPostTime || '12:00';
-      scheduledAt = `${item.scheduledDate}T${time}:00.000Z`;
+      // Convert local time to UTC using the client's timezone offset
+      const localDate = new Date(`${item.scheduledDate}T${time}:00`);
+      if (typeof timezoneOffset === 'number') {
+        // timezoneOffset is in minutes from UTC (e.g. -120 for UTC+2)
+        localDate.setMinutes(localDate.getMinutes() + timezoneOffset);
+      }
+      scheduledAt = localDate.toISOString();
     }
 
     await itemRef.update({ publishStatus: immediate ? 'publishing' : 'scheduled' });
