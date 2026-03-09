@@ -547,7 +547,7 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
                           {/* Day header */}
                           <div className={`${CONTENT_HEADER_COLORS[item.type]} px-3 py-2 text-center`}>
                             <span className="text-white text-xs font-bold tracking-wider">
-                              {getDayName(item.scheduledDate)}
+                              {getDayName(item.scheduledDate)} {item.scheduledDate.slice(8, 10)}/{item.scheduledDate.slice(5, 7)}
                             </span>
                           </div>
 
