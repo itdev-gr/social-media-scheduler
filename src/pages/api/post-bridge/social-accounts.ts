@@ -9,7 +9,7 @@ export const GET: APIRoute = async () => {
       .map((a) => ({
         id: a.id,
         platform: a.platform,
-        name: a.name,
+        name: a.username,
         username: a.username,
       }));
 

@@ -92,8 +92,7 @@ async function request<T>(
 export interface PostBridgeSocialAccount {
   id: number;
   platform: string;
-  name: string;
-  username?: string;
+  username: string;
 }
 
 export interface CreateUploadUrlResponse {
@@ -119,12 +118,12 @@ export async function getSocialAccounts(): Promise<PostBridgeSocialAccount[]> {
   const limit = 100;
 
   while (true) {
-    const data = await request<{ data: PostBridgeSocialAccount[]; metadata: { total: number; next: string | null } }>(
+    const data = await request<{ data: PostBridgeSocialAccount[]; meta?: { total: number; next: string | null } }>(
       'GET',
       `/v1/social-accounts?limit=${limit}&offset=${offset}`
     );
     allAccounts.push(...(data.data || []));
-    if (!data.metadata?.next || (data.data || []).length < limit) break;
+    if (!data.meta?.next || (data.data || []).length < limit) break;
     offset += limit;
   }
 
@@ -152,10 +151,10 @@ export async function createPost(params: {
 }): Promise<PostBridgePost> {
   const body: Record<string, unknown> = {
     caption: params.caption,
-    social_account_ids: params.socialAccountIds,
+    social_accounts: params.socialAccountIds,
   };
   if (params.mediaIds && params.mediaIds.length > 0) {
-    body.media_ids = params.mediaIds;
+    body.media = params.mediaIds;
   }
   if (params.scheduledAt) {
     body.scheduled_at = params.scheduledAt;
