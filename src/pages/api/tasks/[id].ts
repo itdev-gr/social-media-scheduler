@@ -1,10 +1,11 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
 import { requireAdmin, verifyOwnership } from '../../../lib/user-db';
-import type { ContentStatus, ContentType } from '../../../lib/types';
+import type { ContentStatus, ContentType, ApprovalStatus } from '../../../lib/types';
 
 const VALID_STATUSES: ContentStatus[] = ['todo', 'doing', 'done'];
 const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
+const VALID_APPROVAL_STATUSES: ApprovalStatus[] = ['pending', 'approved', 'rejected'];
 
 export const DELETE: APIRoute = async ({ params, locals }) => {
   try {
@@ -127,6 +128,22 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
       updates.scheduledDay = new Date(body.scheduledDate + 'T00:00:00').getDate();
       // Update monthLabel to match the new date
       updates.monthLabel = body.scheduledDate.substring(0, 7);
+    }
+
+    // Approval status
+    if (body.approvalStatus !== undefined) {
+      if (!VALID_APPROVAL_STATUSES.includes(body.approvalStatus)) {
+        return new Response(
+          JSON.stringify({ error: `approvalStatus must be one of: ${VALID_APPROVAL_STATUSES.join(', ')}` }),
+          { status: 400 }
+        );
+      }
+      updates.approvalStatus = body.approvalStatus;
+    }
+
+    // Client notes
+    if (body.clientNotes !== undefined) {
+      updates.clientNotes = typeof body.clientNotes === 'string' ? body.clientNotes : '';
     }
 
     if (Object.keys(updates).length === 0) {

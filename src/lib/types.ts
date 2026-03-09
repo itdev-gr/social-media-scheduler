@@ -7,6 +7,9 @@ export type ContentStatus = 'todo' | 'doing' | 'done';
 // Publish status for Post Bridge integration
 export type PublishStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partially_failed' | 'failed';
 
+// Client approval status
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 // Social account from Post Bridge
 export interface SocialAccount {
   id: number;
@@ -72,6 +75,8 @@ export interface ContentItem {
   publishError?: string;
   retryCount?: number;
   scheduledPostTime?: string;  // HH:mm for time-of-day scheduling
+  approvalStatus?: ApprovalStatus;
+  clientNotes?: string;
 }
 
 // API request/response

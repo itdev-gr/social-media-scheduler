@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 type ContentType = 'POST' | 'VIDEO' | 'CAROUSEL' | 'STORY';
 type ContentStatus = 'todo' | 'doing' | 'done';
 type PublishStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partially_failed' | 'failed';
+type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 type Platform = 'instagram' | 'facebook';
 
 interface ContentItem {
@@ -23,6 +24,8 @@ interface ContentItem {
   publishStatus?: PublishStatus;
   publishError?: string;
   scheduledPostTime?: string;
+  approvalStatus?: ApprovalStatus;
+  clientNotes?: string;
 }
 
 interface ClientOption {
@@ -78,6 +81,14 @@ const CONTENT_HEADER_COLORS: Record<ContentType, string> = {
   STORY: 'bg-pink-600',
 };
 
+const APPROVAL_COLORS: Record<ApprovalStatus, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+const APPROVAL_OPTIONS: ApprovalStatus[] = ['pending', 'approved', 'rejected'];
+
 const SECTIONS: ContentType[] = ['POST', 'VIDEO', 'STORY', 'CAROUSEL'];
 const TYPE_OPTIONS: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const STATUS_OPTIONS: ContentStatus[] = ['todo', 'doing', 'done'];
@@ -97,6 +108,9 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
   const [editName, setEditName] = useState('');
   const [editCaption, setEditCaption] = useState('');
   const [editPlatforms, setEditPlatforms] = useState<Set<Platform>>(new Set());
+  const [editApproval, setEditApproval] = useState<ApprovalStatus>('pending');
+  const [editClientNotes, setEditClientNotes] = useState('');
+  const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -200,6 +214,9 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
     setEditUploadedMediaIds(item.mediaIds || []);
     setEditUploadedMediaUrls(item.mediaUrls || []);
     setEditUploadProgress(null);
+    setEditApproval(item.approvalStatus || 'pending');
+    setEditClientNotes(item.clientNotes || '');
+    setEditMode(false);
     setSaveError('');
     setPublishError('');
   }
@@ -307,6 +324,9 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
         updates.mediaUrls = newMediaUrls;
       }
 
+      if (editApproval !== (selected.approvalStatus || 'pending')) updates.approvalStatus = editApproval;
+      if (editClientNotes !== (selected.clientNotes || '')) updates.clientNotes = editClientNotes;
+
       if (Object.keys(updates).length === 0) {
         closeModal();
         return;
@@ -343,6 +363,8 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
                 mediaIds: newMediaIds.length > 0 ? newMediaIds : undefined,
                 mediaUrls: newMediaUrls.length > 0 ? newMediaUrls : undefined,
                 scheduledPostTime: editTime || undefined,
+                approvalStatus: editApproval,
+                clientNotes: editClientNotes || undefined,
               }
             : i
         )
@@ -579,8 +601,8 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
                             {/* Approval Status */}
                             <div className="flex items-center justify-between px-2.5 py-1.5 bg-yellow-50">
                               <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Approval Status</span>
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_COLORS[item.status]}`}>
-                                {item.status.toUpperCase()}
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${APPROVAL_COLORS[item.approvalStatus || 'pending']}`}>
+                                {(item.approvalStatus || 'pending').toUpperCase()}
                               </span>
                             </div>
 
@@ -630,7 +652,7 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-gray-900">Edit Content Item</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Edit Content</h3>
                 {selected.publishStatus && selected.publishStatus !== 'draft' && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${PUBLISH_STATUS_BADGE[selected.publishStatus].cls}`}>
                     {PUBLISH_STATUS_BADGE[selected.publishStatus].label}
@@ -648,182 +670,281 @@ export default function ContentCalendar({ items: initialItems, clients }: Props)
             </div>
 
             {/* Modal Body */}
-            <div className="px-6 py-5 space-y-4 overflow-y-auto">
-              {/* Client info */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selected.clientName}</span>
-                <span className="text-xs text-gray-400">#{selected.number}</span>
-              </div>
-
-              {/* Content Type */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Content Type</label>
-                <div className="flex gap-2">
-                  {TYPE_OPTIONS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setEditType(t)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                        editType === t
-                          ? `text-white ${CONTENT_COLORS[t]}`
-                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Task Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder={`${selected.type} ${selected.number || ''}`}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-
-              {/* Caption */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Caption / Description</label>
-                <textarea
-                  value={editCaption}
-                  onChange={(e) => setEditCaption(e.target.value)}
-                  rows={4}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                  placeholder="Write your post caption here..."
-                />
-              </div>
-
-              {/* Media Upload */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Media</label>
-                {editMediaPreviews.length > 0 && (
-                  <div className="flex gap-2 mb-2 flex-wrap">
-                    {editMediaPreviews.map((url, i) => (
-                      <div key={i} className="relative w-16 h-16">
-                        <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
-                        <button
-                          type="button"
-                          onClick={() => removeMedia(i)}
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-red-600"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+            <div className="overflow-y-auto">
+              {/* Large media image */}
+              <div className="relative aspect-video bg-gray-100">
+                {editMediaPreviews.length > 0 ? (
+                  <img
+                    src={editMediaPreviews[0]}
+                    alt={itemDisplayName(selected)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <svg className="w-16 h-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
                   </div>
                 )}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,video/mp4"
-                  multiple
-                  onChange={(e) => handleFileSelect(e.target.files)}
-                  className="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
-                />
-                {editUploadProgress !== null && (
-                  <div className="mt-1 text-xs text-indigo-600">Uploading media...</div>
+                {/* Client name overlay */}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-8">
+                  <span className="text-white text-sm font-semibold drop-shadow-sm">
+                    {selected.clientName}
+                  </span>
+                </div>
+              </div>
+
+              {/* Caption & info section */}
+              <div className="px-6 py-4 space-y-3 border-b border-gray-100">
+                {/* Caption text (read-only) */}
+                {selected.caption && (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{selected.caption}</p>
                 )}
+
+                {/* Platform badges, type badge, date/time */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {selected.platforms && selected.platforms.map((p) => (
+                    <span key={p} className="text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                      {p === 'instagram' ? 'Instagram' : 'Facebook'}
+                    </span>
+                  ))}
+                  <span className={`text-[10px] font-semibold text-white px-2 py-0.5 rounded-full ${CONTENT_COLORS[selected.type]}`}>
+                    {selected.type}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {formatDate(selected.scheduledDate)}
+                    {selected.scheduledPostTime ? ` · ${selected.scheduledPostTime}` : ''}
+                  </span>
+                </div>
               </div>
 
-              {/* Platforms */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Platforms</label>
+              {/* Client Approval section */}
+              <div className="px-6 py-4 space-y-3 border-b border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Client Approval</label>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => togglePlatform('instagram')}
-                    disabled={!hasIG}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                      editPlatforms.has('instagram')
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                        : hasIG
-                          ? 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                          : 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    Instagram
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => togglePlatform('facebook')}
-                    disabled={!hasFB}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                      editPlatforms.has('facebook')
-                        ? 'bg-blue-600 text-white'
-                        : hasFB
-                          ? 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                          : 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    Facebook
-                  </button>
-                </div>
-                {socialAccounts.length === 0 && (
-                  <p className="text-[10px] text-gray-400 mt-1">No social accounts connected</p>
-                )}
-              </div>
-
-              {/* Date & Time */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
-                  <input
-                    type="date"
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Post Time</label>
-                  <input
-                    type="time"
-                    value={editTime}
-                    onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
-                <div className="flex gap-2">
-                  {STATUS_OPTIONS.map((s) => (
+                  {APPROVAL_OPTIONS.map((a) => (
                     <button
-                      key={s}
+                      key={a}
                       type="button"
-                      onClick={() => setEditStatus(s)}
+                      onClick={() => setEditApproval(a)}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                        editStatus === s
-                          ? STATUS_COLORS[s] + ' ring-2 ring-offset-1 ring-gray-300'
+                        editApproval === a
+                          ? APPROVAL_COLORS[a] + ' ring-2 ring-offset-1 ring-gray-300'
                           : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                       }`}
                     >
-                      {s.toUpperCase()}
+                      {a.charAt(0).toUpperCase() + a.slice(1)}
                     </button>
                   ))}
                 </div>
+
+                {/* Client notes textarea (visible when rejected) */}
+                {editApproval === 'rejected' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Client Feedback</label>
+                    <textarea
+                      value={editClientNotes}
+                      onChange={(e) => setEditClientNotes(e.target.value)}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:border-red-400 focus:ring-1 focus:ring-red-400 outline-none"
+                      placeholder="Record client's requested changes..."
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Publish error display */}
-              {(selected.publishError || publishError) && (
-                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  {publishError || selected.publishError}
+              {/* Edit Details toggle */}
+              <div className="px-6 py-3">
+                <button
+                  type="button"
+                  onClick={() => setEditMode(!editMode)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors w-full"
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform ${editMode ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  Edit Details
+                </button>
+              </div>
+
+              {/* Expanded edit fields */}
+              {editMode && (
+                <div className="px-6 pb-4 space-y-4 border-t border-gray-100 pt-4">
+                  {/* Content Type */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Content Type</label>
+                    <div className="flex gap-2">
+                      {TYPE_OPTIONS.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setEditType(t)}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                            editType === t
+                              ? `text-white ${CONTENT_COLORS[t]}`
+                              : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Name */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Task Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder={`${selected.type} ${selected.number || ''}`}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Caption */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Caption / Description</label>
+                    <textarea
+                      value={editCaption}
+                      onChange={(e) => setEditCaption(e.target.value)}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      placeholder="Write your post caption here..."
+                    />
+                  </div>
+
+                  {/* Media Upload */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Media</label>
+                    {editMediaPreviews.length > 0 && (
+                      <div className="flex gap-2 mb-2 flex-wrap">
+                        {editMediaPreviews.map((url, i) => (
+                          <div key={i} className="relative w-16 h-16">
+                            <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+                            <button
+                              type="button"
+                              onClick={() => removeMedia(i)}
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-red-600"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,video/mp4"
+                      multiple
+                      onChange={(e) => handleFileSelect(e.target.files)}
+                      className="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                    />
+                    {editUploadProgress !== null && (
+                      <div className="mt-1 text-xs text-indigo-600">Uploading media...</div>
+                    )}
+                  </div>
+
+                  {/* Platforms */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Platforms</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => togglePlatform('instagram')}
+                        disabled={!hasIG}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                          editPlatforms.has('instagram')
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                            : hasIG
+                              ? 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                              : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                        }`}
+                      >
+                        Instagram
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => togglePlatform('facebook')}
+                        disabled={!hasFB}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                          editPlatforms.has('facebook')
+                            ? 'bg-blue-600 text-white'
+                            : hasFB
+                              ? 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                              : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                        }`}
+                      >
+                        Facebook
+                      </button>
+                    </div>
+                    {socialAccounts.length === 0 && (
+                      <p className="text-[10px] text-gray-400 mt-1">No social accounts connected</p>
+                    )}
+                  </div>
+
+                  {/* Date & Time */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
+                      <input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Post Time</label>
+                      <input
+                        type="time"
+                        value={editTime}
+                        onChange={(e) => setEditTime(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
+                    <div className="flex gap-2">
+                      {STATUS_OPTIONS.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setEditStatus(s)}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                            editStatus === s
+                              ? STATUS_COLORS[s] + ' ring-2 ring-offset-1 ring-gray-300'
+                              : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                          {s.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {saveError && (
-                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  {saveError}
-                </div>
-              )}
+              {/* Error displays */}
+              <div className="px-6 pb-2 space-y-2">
+                {(selected.publishError || publishError) && (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {publishError || selected.publishError}
+                  </div>
+                )}
+                {saveError && (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {saveError}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Modal Footer */}
