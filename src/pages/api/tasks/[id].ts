@@ -5,6 +5,36 @@ import type { ContentStatus, ContentType } from '../../../lib/types';
 const VALID_STATUSES: ContentStatus[] = ['todo', 'doing', 'done'];
 const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 
+export const DELETE: APIRoute = async ({ params }) => {
+  try {
+    const { id } = params;
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Item ID is required' }), { status: 400 });
+    }
+
+    const db = getDb();
+    const ref = db.collection('content_items').doc(id);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return new Response(JSON.stringify({ error: 'Content item not found' }), { status: 404 });
+    }
+
+    await ref.delete();
+
+    return new Response(JSON.stringify({ id, deleted: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Delete error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      { status: 500 }
+    );
+  }
+};
+
 export const PATCH: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;

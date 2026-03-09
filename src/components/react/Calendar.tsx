@@ -564,6 +564,29 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
     }
   }
 
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!selected) return;
+    if (!confirm('Are you sure you want to delete this content item?')) return;
+    setDeleting(true);
+    setSaveError('');
+    try {
+      const res = await fetch(`/api/tasks/${selected.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        setSaveError(data.error || 'Failed to delete');
+        return;
+      }
+      setItems((all) => all.filter((i) => i.id !== selected.id));
+      closeModal();
+    } catch {
+      setSaveError('Network error');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // Filtered items indexed by date
   const itemsByDate = useMemo(() => {
     const filtered = items.filter(
@@ -1179,6 +1202,14 @@ export default function Calendar({ items: initialItems, clientId, clientName, cl
 
             <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
               <div className="flex gap-2">
+                {/* Delete button */}
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
                 {/* Post Now button */}
                 {canPublishEdit && selected.publishStatus !== 'published' && selected.publishStatus !== 'publishing' && (
                   <button
