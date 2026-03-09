@@ -1,10 +1,12 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../../lib/user-db';
 
 const VALID_STATUSES = ['todo', 'doing', 'done'];
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const body = await request.json();
 
     if (!body.clientId || typeof body.clientId !== 'string') {
@@ -24,8 +26,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (!clientDoc.exists) {
       return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
     }
+    verifyOwnership(clientDoc, uid);
 
     const taskData = {
+      userId: uid,
       clientId: body.clientId,
       title: body.title.trim(),
       status,
@@ -41,9 +45,10 @@ export const POST: APIRoute = async ({ request }) => {
     });
   } catch (error) {
     console.error('Scheduled task create error:', error);
+    const statusCode = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status: statusCode }
     );
   }
 };

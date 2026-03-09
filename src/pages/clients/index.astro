@@ -13,7 +13,8 @@ let clients: ClientDoc[] = [];
 
 try {
   const db = getDb();
-  const snap = await db.collection('clients').orderBy('createdAt', 'desc').get();
+  const uid = Astro.locals.user!.uid;
+  const snap = await db.collection('clients').where('userId', '==', uid).orderBy('createdAt', 'desc').get();
   clients = snap.docs.map((doc) => ({
     id: doc.id,
     name: doc.data().name,

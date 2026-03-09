@@ -18,15 +18,16 @@ let clientsList: { id: string; name: string }[] = [];
 if (isAdmin) {
   try {
     const db = getDb();
+    const uid = user!.uid;
 
     const [clientsSnap, itemsCountSnap, todoSnap, doingSnap, doneSnap, clientsListSnap, recentItemsSnap] = await Promise.all([
-      db.collection('clients').count().get(),
-      db.collection('content_items').count().get(),
-      db.collection('content_items').where('status', '==', 'todo').count().get(),
-      db.collection('content_items').where('status', '==', 'doing').count().get(),
-      db.collection('content_items').where('status', '==', 'done').count().get(),
-      db.collection('clients').get(),
-      db.collection('content_items').orderBy('scheduledDate', 'asc').limit(500).get(),
+      db.collection('clients').where('userId', '==', uid).count().get(),
+      db.collection('content_items').where('userId', '==', uid).count().get(),
+      db.collection('content_items').where('userId', '==', uid).where('status', '==', 'todo').count().get(),
+      db.collection('content_items').where('userId', '==', uid).where('status', '==', 'doing').count().get(),
+      db.collection('content_items').where('userId', '==', uid).where('status', '==', 'done').count().get(),
+      db.collection('clients').where('userId', '==', uid).get(),
+      db.collection('content_items').where('userId', '==', uid).orderBy('scheduledDate', 'asc').limit(500).get(),
     ]);
 
     totalClients = clientsSnap.data().count;

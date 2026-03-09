@@ -1,0 +1,53 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ContentCalendar from '../../components/react/ContentCalendar';
+import { getDb } from '../../lib/firebase-admin';
+
+let contentItems: any[] = [];
+let clientsList: { id: string; name: string }[] = [];
+
+try {
+  const db = getDb();
+  const uid = Astro.locals.user!.uid;
+
+  const [itemsSnap, clientsSnap] = await Promise.all([
+    db.collection('content_items').where('userId', '==', uid).orderBy('scheduledDate', 'asc').limit(1000).get(),
+    db.collection('clients').where('userId', '==', uid).get(),
+  ]);
+
+  const clientMap = new Map<string, string>();
+  clientsSnap.docs.forEach((d) => {
+    clientMap.set(d.id, d.data().name);
+    clientsList.push({ id: d.id, name: d.data().name });
+  });
+
+  for (const doc of itemsSnap.docs) {
+    const data = doc.data();
+    contentItems.push({
+      id: doc.id,
+      type: data.type,
+      number: data.number,
+      customName: data.customName,
+      status: data.status,
+      scheduledDate: data.scheduledDate,
+      scheduledDay: data.scheduledDay,
+      monthLabel: data.monthLabel,
+      clientId: data.clientId,
+      clientName: clientMap.get(data.clientId) || 'Unknown',
+      caption: data.caption,
+      mediaUrls: data.mediaUrls,
+      platforms: data.platforms,
+      publishStatus: data.publishStatus,
+      publishError: data.publishError,
+      scheduledPostTime: data.scheduledPostTime,
+    });
+  }
+} catch (e) {
+  // Firebase not configured yet or collection doesn't exist
+}
+---
+
+<Layout title="Content Calendar">
+  <h2 class="text-2xl font-bold text-gray-900 mb-6">Content Calendar</h2>
+  <ContentCalendar client:load items={contentItems} clients={clientsList} />
+</Layout>

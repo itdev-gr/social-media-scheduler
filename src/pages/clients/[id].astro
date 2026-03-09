@@ -26,9 +26,10 @@ let doneCount = 0;
 
 try {
   const db = getDb();
+  const uid = Astro.locals.user!.uid;
 
   const clientDoc = await db.collection('clients').doc(id).get();
-  if (!clientDoc.exists) {
+  if (!clientDoc.exists || clientDoc.data()?.userId !== uid) {
     return Astro.redirect('/clients');
   }
   const clientData = clientDoc.data() as { name: string; createdAt: string; notes?: string; active?: boolean; clickupId?: string };

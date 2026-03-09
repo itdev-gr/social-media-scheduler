@@ -1,10 +1,12 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../../lib/user-db';
 import { getSocialAccounts, createPost } from '../../../lib/post-bridge';
 import type { ContentItem } from '../../../lib/types';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const body = await request.json();
     const { contentItemId, immediate, timezoneOffset } = body;
 
@@ -20,6 +22,8 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({ error: 'Content item not found' }), { status: 404 });
     }
 
+    verifyOwnership(itemDoc, uid);
+
     const item = itemDoc.data() as ContentItem;
 
     if (!item.caption) {
@@ -34,6 +38,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Look up social account IDs — use client's assigned accounts if available, otherwise match by platform
     const clientDoc = await db.collection('clients').doc(item.clientId).get();
+    if (clientDoc.exists) {
+      verifyOwnership(clientDoc, uid);
+    }
     const clientData = clientDoc.exists ? clientDoc.data() as { socialAccountIds?: number[] } : {};
 
     let socialAccountIds: number[];
@@ -95,6 +102,10 @@ export const POST: APIRoute = async ({ request }) => {
     );
   } catch (error) {
     console.error('Publish error:', error);
+
+    if (error instanceof Error && error.message === 'Forbidden') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+    }
 
     // Try to update the content item with failure status
     try {

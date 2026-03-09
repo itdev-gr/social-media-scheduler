@@ -8,15 +8,17 @@ let initialItems: any[] = [];
 
 try {
   const db = getDb();
+  const uid = Astro.locals.user!.uid;
 
-  // Get all distinct month labels
-  const monthsSnap = await db.collection('months').orderBy('label', 'asc').get();
+  // Get all distinct month labels for this user
+  const monthsSnap = await db.collection('months').where('userId', '==', uid).orderBy('label', 'asc').get();
   months = [...new Set(monthsSnap.docs.map((d) => d.data().label))];
 
   // Fetch content items for the first month
   if (months.length > 0) {
     const itemsSnap = await db
       .collection('content_items')
+      .where('userId', '==', uid)
       .where('monthLabel', '==', months[0])
       .orderBy('scheduledDate', 'asc')
       .get();

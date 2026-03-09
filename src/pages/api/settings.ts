@@ -1,9 +1,8 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
+import { requireAdmin } from '../../lib/user-db';
 import type { SchedulingSettings, PackageDelays } from '../../lib/types';
 import { PACKAGE_NAMES } from '../../lib/types';
-
-const SETTINGS_DOC_ID = 'scheduling';
 
 const DEFAULT_DELAYS: PackageDelays = {
   postDelayDays: 0,
@@ -20,10 +19,11 @@ function buildDefaults(): SchedulingSettings {
   return settings;
 }
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const db = getDb();
-    const doc = await db.collection('settings').doc(SETTINGS_DOC_ID).get();
+    const doc = await db.collection('settings').doc('scheduling_' + uid).get();
     const defaults = buildDefaults();
 
     if (doc.exists) {
@@ -41,15 +41,17 @@ export const GET: APIRoute = async () => {
     });
   } catch (error) {
     console.error('Settings GET error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };
 
-export const PATCH: APIRoute = async ({ request }) => {
+export const PATCH: APIRoute = async ({ request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const body = (await request.json()) as Partial<SchedulingSettings>;
     const updates: Record<string, PackageDelays> = {};
 
@@ -66,7 +68,7 @@ export const PATCH: APIRoute = async ({ request }) => {
     }
 
     const db = getDb();
-    const ref = db.collection('settings').doc(SETTINGS_DOC_ID);
+    const ref = db.collection('settings').doc('scheduling_' + uid);
     await ref.set(updates, { merge: true });
 
     const doc = await ref.get();
@@ -86,9 +88,10 @@ export const PATCH: APIRoute = async ({ request }) => {
     });
   } catch (error) {
     console.error('Settings PATCH error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };

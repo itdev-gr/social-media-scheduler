@@ -1,10 +1,12 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../../../lib/user-db';
 import { getPostResults } from '../../../../lib/post-bridge';
 import type { ContentItem, PublishStatus } from '../../../../lib/types';
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ error: 'Content item ID is required' }), { status: 400 });
@@ -17,6 +19,8 @@ export const GET: APIRoute = async ({ params }) => {
     if (!itemDoc.exists) {
       return new Response(JSON.stringify({ error: 'Content item not found' }), { status: 404 });
     }
+
+    verifyOwnership(itemDoc, uid);
 
     const item = itemDoc.data() as ContentItem;
 
@@ -60,9 +64,10 @@ export const GET: APIRoute = async ({ params }) => {
     );
   } catch (error) {
     console.error('Status check error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to check status' }),
-      { status: 500 }
+      { status }
     );
   }
 };

@@ -13,14 +13,15 @@ let clientsList: { id: string; name: string }[] = [];
 
 try {
   const db = getDb();
+  const uid = Astro.locals.user!.uid;
 
   const [totalSnap, todoSnap, doingSnap, doneSnap, clientsListSnap, tasksSnap] = await Promise.all([
-    db.collection('scheduled_tasks').count().get(),
-    db.collection('scheduled_tasks').where('status', '==', 'todo').count().get(),
-    db.collection('scheduled_tasks').where('status', '==', 'doing').count().get(),
-    db.collection('scheduled_tasks').where('status', '==', 'done').count().get(),
-    db.collection('clients').get(),
-    db.collection('scheduled_tasks').orderBy('scheduledDate', 'asc').limit(500).get(),
+    db.collection('scheduled_tasks').where('userId', '==', uid).count().get(),
+    db.collection('scheduled_tasks').where('userId', '==', uid).where('status', '==', 'todo').count().get(),
+    db.collection('scheduled_tasks').where('userId', '==', uid).where('status', '==', 'doing').count().get(),
+    db.collection('scheduled_tasks').where('userId', '==', uid).where('status', '==', 'done').count().get(),
+    db.collection('clients').where('userId', '==', uid).get(),
+    db.collection('scheduled_tasks').where('userId', '==', uid).orderBy('scheduledDate', 'asc').limit(500).get(),
   ]);
 
   totalTasks = totalSnap.data().count;

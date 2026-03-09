@@ -1,12 +1,14 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../../lib/user-db';
 import type { ContentStatus, ContentType } from '../../../lib/types';
 
 const VALID_STATUSES: ContentStatus[] = ['todo', 'doing', 'done'];
 const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ error: 'Item ID is required' }), { status: 400 });
@@ -20,6 +22,8 @@ export const DELETE: APIRoute = async ({ params }) => {
       return new Response(JSON.stringify({ error: 'Content item not found' }), { status: 404 });
     }
 
+    verifyOwnership(doc, uid);
+
     await ref.delete();
 
     return new Response(JSON.stringify({ id, deleted: true }), {
@@ -28,15 +32,17 @@ export const DELETE: APIRoute = async ({ params }) => {
     });
   } catch (error) {
     console.error('Delete error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };
 
-export const PATCH: APIRoute = async ({ params, request }) => {
+export const PATCH: APIRoute = async ({ params, request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ error: 'Item ID is required' }), { status: 400 });
@@ -135,6 +141,8 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       return new Response(JSON.stringify({ error: 'Content item not found' }), { status: 404 });
     }
 
+    verifyOwnership(doc, uid);
+
     await ref.update(updates);
 
     return new Response(JSON.stringify({ id, ...updates }), {
@@ -143,9 +151,10 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     });
   } catch (error) {
     console.error('Update error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };

@@ -1,12 +1,14 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../../lib/user-db';
 import { getSocialAccounts, createPost } from '../../../lib/post-bridge';
 import type { ContentItem } from '../../../lib/types';
 
 const MAX_RETRIES = 3;
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const body = await request.json();
     const { contentItemId } = body;
 
@@ -21,6 +23,8 @@ export const POST: APIRoute = async ({ request }) => {
     if (!itemDoc.exists) {
       return new Response(JSON.stringify({ error: 'Content item not found' }), { status: 404 });
     }
+
+    verifyOwnership(itemDoc, uid);
 
     const item = itemDoc.data() as ContentItem;
     const currentRetry = item.retryCount || 0;
@@ -49,6 +53,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Use client's assigned accounts if available
     const clientDoc = await db.collection('clients').doc(item.clientId).get();
+    if (clientDoc.exists) {
+      verifyOwnership(clientDoc, uid);
+    }
     const clientData = clientDoc.exists ? clientDoc.data() as { socialAccountIds?: number[] } : {};
 
     let socialAccountIds: number[];
@@ -91,6 +98,10 @@ export const POST: APIRoute = async ({ request }) => {
     );
   } catch (error) {
     console.error('Retry error:', error);
+
+    if (error instanceof Error && error.message === 'Forbidden') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+    }
 
     try {
       const body = await request.clone().json().catch(() => null);

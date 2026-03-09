@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
+import { requireAdmin } from '../../lib/user-db';
 import type { GenerateRequest, GenerateResponse, Client, Plan, Month, ContentItem, ContentType, PackageDelays, PackageName } from '../../lib/types';
 import { PACKAGE_NAMES } from '../../lib/types';
 import { addDays } from '../../lib/date-utils';
@@ -20,8 +21,9 @@ async function batchWrite(
   }
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const body = (await request.json()) as GenerateRequest;
 
     if (!body.clientName?.trim()) {
@@ -47,7 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
     let delays = defaultDelays;
     const pkgName = body.packageName as PackageName | undefined;
     if (pkgName && PACKAGE_NAMES.includes(pkgName)) {
-      const settingsDoc = await db.collection('settings').doc('scheduling').get();
+      const settingsDoc = await db.collection('settings').doc('scheduling_' + uid).get();
       if (settingsDoc.exists) {
         const data = settingsDoc.data() as Record<string, unknown>;
         if (data[pkgName] && typeof data[pkgName] === 'object') {
@@ -58,7 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Create client
     const clientRef = db.collection('clients').doc();
-    const client: Client = { name: body.clientName.trim(), createdAt: now, notes: body.notes || '', clickupId: body.clickupId || '' };
+    const client: Client = { userId: uid, name: body.clientName.trim(), createdAt: now, notes: body.notes || '', clickupId: body.clickupId || '' };
     if (Array.isArray(body.socialAccountIds) && body.socialAccountIds.length > 0) {
       client.socialAccountIds = body.socialAccountIds;
     }
@@ -68,6 +70,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Create plan
     const planRef = db.collection('plans').doc();
     const plan: Plan = {
+      userId: uid,
       clientId,
       startMonth: body.startDate.substring(0, 7),
       monthsCount: body.monthsCount,
@@ -93,6 +96,7 @@ export const POST: APIRoute = async ({ request }) => {
     for (const task of onboardingTasks) {
       const ref = db.collection('scheduled_tasks').doc();
       onboardingBatch.set(ref, {
+        userId: uid,
         clientId,
         title: task.title,
         status: 'todo',
@@ -132,6 +136,7 @@ export const POST: APIRoute = async ({ request }) => {
       const periodDate = new Date(periodStart + 'T00:00:00');
       const monthRef = db.collection('months').doc();
       const monthDoc: Month = {
+        userId: uid,
         clientId,
         planId,
         label: periodLabel,
@@ -166,6 +171,7 @@ export const POST: APIRoute = async ({ request }) => {
 
         const contentRef = db.collection('content_items').doc();
         const contentItem: Omit<ContentItem, 'id'> = {
+          userId: uid,
           clientId,
           planId,
           monthId,
@@ -194,6 +200,7 @@ export const POST: APIRoute = async ({ request }) => {
       editTaskWrites.push({
         ref: editTaskRef,
         data: {
+          userId: uid,
           clientId,
           title: `Edit - ${postName} - ${client.name}`,
           status: 'todo',
@@ -216,9 +223,10 @@ export const POST: APIRoute = async ({ request }) => {
     });
   } catch (error) {
     console.error('Generate error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };

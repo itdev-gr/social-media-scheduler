@@ -1,8 +1,10 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../../lib/user-db';
 
-export const POST: APIRoute = async ({ params, request }) => {
+export const POST: APIRoute = async ({ params, request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ error: 'Client ID is required' }), { status: 400 });
@@ -21,6 +23,8 @@ export const POST: APIRoute = async ({ params, request }) => {
     if (!doc.exists) {
       return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
     }
+
+    verifyOwnership(doc, uid);
 
     // Delete all related data in parallel
     const [plansSnap, monthsSnap, itemsSnap, scheduledTasksSnap] = await Promise.all([
@@ -51,15 +55,17 @@ export const POST: APIRoute = async ({ params, request }) => {
     });
   } catch (error) {
     console.error('Client delete error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };
 
-export const PATCH: APIRoute = async ({ params, request }) => {
+export const PATCH: APIRoute = async ({ params, request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ error: 'Client ID is required' }), { status: 400 });
@@ -122,6 +128,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       if (!doc.exists) {
         return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
       }
+      verifyOwnership(doc, uid);
       await ref.update(clientUpdates);
     }
 
@@ -139,9 +146,10 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     });
   } catch (error) {
     console.error('Client update error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };

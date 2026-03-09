@@ -1,14 +1,17 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
+import { requireAdmin } from '../../lib/user-db';
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const db = getDb();
     const monthParam = url.searchParams.get('month');
     const statusParam = url.searchParams.get('status');
     const clientIdParam = url.searchParams.get('clientId');
 
-    let query: FirebaseFirestore.Query = db.collection('content_items');
+    let query: FirebaseFirestore.Query = db.collection('content_items')
+      .where('userId', '==', uid);
 
     if (clientIdParam) {
       query = query.where('clientId', '==', clientIdParam);
@@ -57,9 +60,10 @@ export const GET: APIRoute = async ({ url }) => {
     });
   } catch (error) {
     console.error('Pipelines error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };

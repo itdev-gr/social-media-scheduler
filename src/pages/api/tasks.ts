@@ -1,12 +1,14 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/firebase-admin';
+import { requireAdmin, verifyOwnership } from '../../lib/user-db';
 import type { ContentType, ContentStatus } from '../../lib/types';
 
 const VALID_TYPES: ContentType[] = ['POST', 'VIDEO', 'CAROUSEL', 'STORY'];
 const VALID_STATUSES: ContentStatus[] = ['todo', 'doing', 'done'];
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
+    const uid = requireAdmin(locals);
     const body = await request.json();
 
     if (!body.clientId || typeof body.clientId !== 'string') {
@@ -26,11 +28,12 @@ export const POST: APIRoute = async ({ request }) => {
 
     const db = getDb();
 
-    // Verify client exists
+    // Verify client exists and is owned by this user
     const clientDoc = await db.collection('clients').doc(body.clientId).get();
     if (!clientDoc.exists) {
       return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404 });
     }
+    verifyOwnership(clientDoc, uid);
 
     // Find plan
     const planSnap = await db.collection('plans').where('clientId', '==', body.clientId).limit(1).get();
@@ -57,6 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
     if (monthSnap.empty) {
       const monthRef = db.collection('months').doc();
       await monthRef.set({
+        userId: uid,
         clientId: body.clientId,
         planId,
         label: monthLabel,
@@ -80,6 +84,7 @@ export const POST: APIRoute = async ({ request }) => {
     const scheduledDay = new Date(body.scheduledDate + 'T00:00:00').getDate();
     const contentRef = db.collection('content_items').doc();
     const contentItem: Record<string, unknown> = {
+      userId: uid,
       clientId: body.clientId,
       planId,
       monthId,
@@ -119,6 +124,7 @@ export const POST: APIRoute = async ({ request }) => {
     const editTaskDate = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
     const editTaskRef = db.collection('scheduled_tasks').doc();
     await editTaskRef.set({
+      userId: uid,
       clientId: body.clientId,
       title: `Edit - ${postName} - ${clientData.name}`,
       status: 'todo',
@@ -131,9 +137,10 @@ export const POST: APIRoute = async ({ request }) => {
     });
   } catch (error) {
     console.error('Create task error:', error);
+    const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 500;
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500 }
+      { status }
     );
   }
 };

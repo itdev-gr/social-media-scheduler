@@ -18,6 +18,7 @@ export interface SocialAccount {
 // Firestore document interfaces
 export interface Client {
   id?: string;
+  userId?: string;
   name: string;
   createdAt: string; // ISO string
   notes?: string;
@@ -28,6 +29,7 @@ export interface Client {
 
 export interface Plan {
   id?: string;
+  userId?: string;
   clientId: string;
   startMonth: string; // YYYY-MM
   monthsCount: number;
@@ -40,6 +42,7 @@ export interface Plan {
 
 export interface Month {
   id?: string;
+  userId?: string;
   clientId: string;
   planId: string;
   label: string; // YYYY-MM
@@ -49,6 +52,7 @@ export interface Month {
 
 export interface ContentItem {
   id?: string;
+  userId?: string;
   clientId: string;
   planId: string;
   monthId: string;
